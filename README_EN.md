@@ -1,7 +1,6 @@
 # English | [Русский](README.md)
 
 # Discord ChatGPT Bot
-
 ## All providers are operational and tested in the RU region. Your experience may vary!
 ## Works correctly on Python version 3.11.5
 
@@ -9,7 +8,7 @@
 * **Special thanks to Zero6992 for the open-source project <3**
 
 # Features
-* **Most of the modified code was written using ChatGPT**
+* **Most of the modified code was written using ChatGPT and other AI models for Experiment**
 * **The bot can communicate both in Discord channels and in direct messages**
 
 # Differences from the original version
@@ -18,7 +17,7 @@
 * A larger number of chat models using the gpt4free library
 * Support for SDXL and FLUX models for image generation
 * Support for "memory" for each user that does not reset upon bot restart
-* Memory reset works individually for users, not globally
+* Memory `/reset` works individually for users, not globally (none)
 
 -----
 
@@ -28,6 +27,8 @@
 * In the Windows Terminal, run `pip3 install -r requirements.txt` | `pip install -r requirements.txt` to install all required libraries
 -----
 ## Create your Discord bot
+Download build bot: https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs/heads/main.zip
+
 1. Go to https://discord.com/developers/applications and create an application
 2. Navigate to the **Bot** section, obtain the Token, and insert it into `.env` in the line: `DISCORD_BOT_TOKEN`
 3. Enable `Server Members Intent` and `Message Content Intent`
