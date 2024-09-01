@@ -14,7 +14,7 @@
 # Differences from the original version
 ## The main difference is the support for conversation history for each user separately
 
-* A larger number of chat models using the gpt4free library
+* A larger number of chat models using the **gpt4free** library: https://github.com/xtekky/gpt4free
 * Support for SDXL and FLUX models for image generation
 * Support for "memory" for each user that does not reset upon bot restart
 * Memory `/reset` works individually for users, not globally (none)
