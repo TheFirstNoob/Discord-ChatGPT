@@ -61,8 +61,8 @@ Download build bot: https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs
 ## Commands
 
 **MAIN:**
-1. `/ask {Your query} {Additional query}`: Chat with AI (a separate memory of your queries is created in DMs)
-2. `/draw {Your request in English} {Service}`: Create an image using the SDXL or FLUX model
+1. `/ask {prompt} {Additional query}`: Chat with AI (a separate memory of your queries is created in DMs)
+2. `/draw {prompt} {Service}`: Create an image using the SDXL or FLUX model
 
 **INFORMATION:**
 1. `/help`: Display information on how to use Hitagi ChatGPT (shows a list of commands)
