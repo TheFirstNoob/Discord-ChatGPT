@@ -11,15 +11,24 @@ from typing import Optional
 
 from g4f.client import Client
 from g4f.Provider import (
-    RetryProvider, Chatgpt4o, FreeChatgpt, DDG, Liaobots, Blackbox, ChatGot, FreeGpt,
-    HuggingChat, HuggingFace, PerplexityLabs, Pi, LiteIcoding, AiChatOnline, Pizzagpt,
-    FreeNetfly, MagickPenAsk, MagickPenChat, TeachAnything, DeepInfra, ChatgptFree,
-    DeepInfraImage
+    AiChatOnline, Blackbox, ChatGot, Chatgpt4o, ChatgptFree, DDG, DeepInfra,
+    DeepInfraImage, FreeChatgpt, FreeGpt, FreeNetfly, HuggingChat, HuggingFace,
+    Liaobots, LiteIcoding, MagickPenAsk, MagickPenChat, PerplexityLabs, Pi,
+    Pizzagpt, RetryProvider
 )
 
 from src.aclient import discordClient
 from discord import app_commands
-from src import log
+
+def load_user_data(user_id):
+    """Загружает данные пользователя из файла."""
+    file_path = f'user_data/{user_id}.json'
+    
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return json.load(file)
+    else:
+        return {}
 
 def run_discord_bot():
     @discordClient.event
@@ -36,8 +45,13 @@ def run_discord_bot():
 
         if interaction.user == discordClient.user:
             return
+
         username = str(interaction.user)
         discordClient.current_channel = interaction.channel
+
+        user_id = interaction.user.id
+        user_data = load_user_data(user_id)
+        user_model = user_data.get('model', discordClient.default_model)
 
         if additionalmessage:
             combined_message = f"{message} {additionalmessage}"
@@ -45,6 +59,7 @@ def run_discord_bot():
             message = combined_message
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] в ({discordClient.current_channel})")
+
         await discordClient.enqueue_message(interaction, message)
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
@@ -77,8 +92,12 @@ def run_discord_bot():
     ])
     async def chat_model(interaction: discord.Interaction, model: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
-        
-        # Думаю нужно уже использовать alias для некоторых моделей, лимиты дискорда уже близко...
+
+        user_id = interaction.user.id
+        username = str(interaction.user)
+
+        discordClient.set_user_model(user_id, model.value)
+
         providers = {
             "gpt-3.5-turbo": RetryProvider([FreeChatgpt, FreeNetfly], shuffle=False),
             "gpt-4": RetryProvider([FreeNetfly], shuffle=False),
@@ -107,32 +126,17 @@ def run_discord_bot():
             "Qwen2-7B-Instruct": RetryProvider([FreeChatgpt], shuffle=False),
         }
 
-        exclusive_models = []  # Если есть эксклюзивные модели, добавьте их сюда
-
-        if model.value in exclusive_models:
-            user_id = interaction.user.id
-
-            if user_id in []:
-                await interaction.followup.send(f"> **ИНФО: Вам доступна эта эксклюзивная модель, но она может быть нестабильна. Используйте на свой страх и риск!**")
-            else:
-                await interaction.followup.send(f"> **Ошибка: Выбранная модель в данный момент доступна только TheFirstNoob. Скорее всего он отключил ее из-за нестабильности работы или она перестала работать. Пожалуйста, воспользуйтесь другой моделью!**")
-                return
-
-        # Оно нам сейчас не надо, оставил как заплатка на текущий момент
-        #user_id = interaction.user.id
-        #discordClient.reset_conversation_history(user_id)
-        
         selected_provider = providers.get(model.value)
-        # Обновление провайдера и модели
         discordClient.chatBot = Client(provider=selected_provider)
-        discordClient.chatModel = model.value
 
-        # Вызов стартового промта при смене модели
-        # Не отсылаем стартовый промпт для этих моделей из-за особенностей провайдера
-        if model.value not in ["llama-3.1-sonar-large-128k-online", "llama-3.1-sonar-large-128k-chat"]:
-            await discordClient.send_start_prompt()
+        # Вызов стартового промпта при смене модели
+        # Больше не требуется, наверное...
+        #if model.value not in ["llama-3.1-sonar-large-128k-online", "llama-3.1-sonar-large-128k-chat"]:
+        #    await discordClient.send_start_prompt()
 
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
+
+        logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
 
         if model.value == "Gemini-Pro":
             await interaction.followup.send("> :warning: **Провайдеры этой модели могут быть нестабильны и могут отваливаться!**")
@@ -163,7 +167,7 @@ def run_discord_bot():
         username = str(interaction.user)
         help_file_path = 'texts/help.txt'
         if not os.path.exists(help_file_path):
-            await interaction.followup.send("> **Ошибка:** Файл справки не найден! Пожалуйста, свяжитесь с TheFirstNoob и сообщите ему об этой ошибке.**")
+            await interaction.followup.send("> **Ошибка:** Файл справки не найден! Пожалуйста, свяжитесь с (Ваше имя) и сообщите ему об этой ошибке.**")
             logger.error(f"Файл справки не найден: {help_file_path}")
             return
         with open(help_file_path, 'r', encoding='utf-8') as file:
@@ -177,7 +181,7 @@ def run_discord_bot():
         username = str(interaction.user)
         info_file_path = 'texts/info.txt'
         if not os.path.exists(info_file_path):
-            await interaction.followup.send("> **Ошибка:** Файл информации не найден! Пожалуйста, свяжитесь с TheFirstNoob и сообщите ему об этой ошибке, возможно он еще не добавил информацию об этой моделе.**")
+            await interaction.followup.send("> **Ошибка:** Файл информации не найден! Пожалуйста, свяжитесь с (Ваше имя) и сообщите ему об этой ошибке, возможно он еще не добавил информацию об этой моделе.**")
             logger.error(f"Файл информации не найден: {info_file_path}")
             return
         with open(info_file_path, 'r', encoding='utf-8') as file:
@@ -225,7 +229,6 @@ def run_discord_bot():
         app_commands.Choice(name="2.2.0", value="2.2.0"),
         app_commands.Choice(name="2.1.0", value="2.1.0"),
         app_commands.Choice(name="2.0.0", value="2.0.0"),
-        # Добавьте другие версии и их названия здесь
     ])
     async def changelog(interaction: discord.Interaction, version: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
@@ -251,14 +254,11 @@ def run_discord_bot():
     ])
     async def draw(interaction: discord.Interaction, prompt: str, service: app_commands.Choice[str], height: Optional[int] = 1024, width: Optional[int] = 1024):
         if service.value == "flux":
-            # Проверка для модели FLUX
             if height is None or width is None or height < 256 or height > 1440 or width < 256 or width > 1440:
                 await interaction.response.send_message("**Ошибка:** Высота и ширина изображения для модели FLUX поддерживают от 256 до 1440 пикселей. Мы установили стандартное значение 1024 на 1024, чтобы вы все равно могли посмотреть результат.")
                 height = 1024
                 width = 1024
-
         else:
-            # Проверка для других моделей
             if height is not None and (height < 128 or height > 1920) or width is not None and (width < 128 or width > 1920):
                 await interaction.response.send_message("**Ошибка:** Высота и ширина изображения для данной модели поддерживают от 128 до 1920 пикселей. Мы установили стандартное значение 1024 на 1024, чтобы вы все равно могли посмотреть результат.")
                 height = 1024

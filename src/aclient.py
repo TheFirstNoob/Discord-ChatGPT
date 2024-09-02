@@ -2,35 +2,43 @@ import os
 import json
 import discord
 import asyncio
-
+import aiofiles
+from dotenv import load_dotenv
 from src.log import logger, setup_logger
 from utils.message_utils import send_split_message
-
-from dotenv import load_dotenv
 from discord import app_commands
 from asgiref.sync import sync_to_async
-
 import g4f.debug
 from g4f.client import Client
 from g4f.stubs import ChatCompletion
-from g4f.Provider import RetryProvider, DDG, Pizzagpt
+from g4f.Provider import (
+    AiChatOnline, Blackbox, ChatGot, Chatgpt4o, ChatgptFree, DDG, DeepInfra,
+    DeepInfraImage, FreeChatgpt, FreeGpt, FreeNetfly, HuggingChat, HuggingFace,
+    Liaobots, LiteIcoding, MagickPenAsk, MagickPenChat, PerplexityLabs, Pi,
+    Pizzagpt, RetryProvider
+)
+
+load_dotenv()
 
 g4f.debug.logging = True
+user_data_cache = {}
 
 USER_DATA_DIR = 'user_data'
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 
-class discordClient(discord.Client):
+class DiscordClient(discord.Client):
     def __init__(self) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
-        self.chatBot = Client(
-            provider=RetryProvider([Pizzagpt, DDG], shuffle=False),
-        )
-        self.chatModel = os.getenv("MODEL")
+        self.default_model = os.getenv("MODEL")
+        self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
+        self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
+
+        self.default_provider = RetryProvider([Pizzagpt, DDG], shuffle=False)
+        self.chatBot = Client(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
 
@@ -87,41 +95,94 @@ class discordClient(discord.Client):
             logger.exception(f"Ошибка при отправке промта: {e}")
 
     async def handle_response(self, user_id: int, user_message: str) -> str:
-        conversation_history = load_user_history(user_id)
+        user_data = await load_user_data(user_id)
+        conversation_history = user_data.get('history', [])
+        user_model = user_data.get('model', self.default_model)
+
         conversation_history.append({'role': 'user', 'content': user_message})
 
-        if len(conversation_history) > 30:
+        if len(conversation_history) > self.max_history_length:
             conversation_history = conversation_history[3:]  # Удаляем по 3 первых сообщения при переполении памяти
 
-        async_create = sync_to_async(self.chatBot.chat.completions.create, thread_sensitive=True)
+        selected_provider = self.get_provider_for_model(user_model)
+        self.default_provider = selected_provider 
+        self.chatBot = Client(provider=selected_provider)
 
-        response: ChatCompletion = await async_create(model=self.chatModel, messages=conversation_history)
-        model_response = f"> :robot: **Вам отвечает модель:** *{self.chatModel}* \n > :wrench: **Версия ИИ:** *{os.environ.get('VERSION_BOT')}*"
+        async_create = sync_to_async(self.chatBot.chat.completions.create, thread_sensitive=True)
+        response: ChatCompletion = await async_create(model=user_model, messages=conversation_history)
+
+        model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия Hitagi ChatGPT:** *{os.environ.get('VERSION_BOT')}*"
         bot_response = response.choices[0].message.content
         conversation_history.append({'role': 'assistant', 'content': bot_response})
 
-        save_user_history(user_id, conversation_history)
+        await save_user_data(user_id, {'history': conversation_history, 'model': user_model})
 
         return f"{model_response}\n\n{bot_response}"
 
-    def reset_conversation_history(self, user_id: int):
-        save_user_history(user_id, [])
+    def get_provider_for_model(self, model: str):
+        providers = {
+            "gpt-3.5-turbo": RetryProvider([FreeChatgpt, FreeNetfly], shuffle=False),
+            "gpt-4": RetryProvider([FreeNetfly], shuffle=False),
+            "gpt-4-0613": RetryProvider([Liaobots], shuffle=False),
+            "gpt-4-turbo-2024-04-09": RetryProvider([Liaobots], shuffle=False),
+            "gpt-4o-mini": RetryProvider([Pizzagpt, AiChatOnline, ChatgptFree, DDG, Liaobots, MagickPenChat, MagickPenAsk], shuffle=False),
+            "gpt-4o": RetryProvider([Chatgpt4o, Liaobots, LiteIcoding, AiChatOnline], shuffle=False),
+            "gpt-4o-free": RetryProvider([Liaobots], shuffle=False),
+            "claude-3-haiku-20240307": RetryProvider([DDG, Liaobots], shuffle=False),
+            "blackbox": RetryProvider([Blackbox], shuffle=False),
+            "Gemini-Pro": RetryProvider([ChatGot], shuffle=False),
+            "CohereForAI/c4ai-command-r-plus": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
+            "pi": RetryProvider([Pi], shuffle=False),
+            "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo": RetryProvider([DDG], shuffle=False),
+            "meta-llama/Meta-Llama-3.1-70B-Instruct": RetryProvider([HuggingChat, HuggingFace, Blackbox, DeepInfra, FreeGpt], shuffle=False),
+            "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8": RetryProvider([HuggingChat, HuggingFace, Blackbox], shuffle=False),
+            "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
+            "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
+            "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
+            "mistralai/Mixtral-8x7B-Instruct-v0.1": RetryProvider([HuggingChat, DDG, HuggingFace], shuffle=False),
+            "mistralai/Mistral-7B-Instruct-v0.2": RetryProvider([HuggingChat], shuffle=False),
+            "microsoft/Phi-3-mini-4k-instruct": RetryProvider([HuggingChat], shuffle=False),
+            "Yi-1.5-9B-Chat": RetryProvider([FreeChatgpt], shuffle=False),
+            "01-ai/Yi-1.5-34B-Chat": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
+            "SparkDesk-v1.1": RetryProvider([FreeChatgpt], shuffle=False),
+            "Qwen2-7B-Instruct": RetryProvider([FreeChatgpt], shuffle=False),
+        }
 
-# Функции для работы с JSON-файлами
-def get_user_data_filepath(user_id):
+        return providers.get(model, self.default_provider)
+
+    def reset_conversation_history(self, user_id: int):
+        save_user_data(user_id, {'history': [], 'model': self.default_model})
+
+    def set_user_model(self, user_id: int, model_name: str):
+        user_data = load_user_data(user_id)
+        user_data['model'] = model_name
+        save_user_data(user_id, user_data)
+
+async def get_user_data_filepath(user_id):
+    if user_id is None:
+        return os.path.join(USER_DATA_DIR, 'system.json')
     return os.path.join(USER_DATA_DIR, f'{user_id}.json')
 
-def load_user_history(user_id):
-    filepath = get_user_data_filepath(user_id)
+async def load_user_data(user_id):
+    if user_id in user_data_cache:
+        return user_data_cache[user_id]
+
+    filepath = await get_user_data_filepath(user_id)
     if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as file:
-            return json.load(file).get('history', [])
+        async with aiofiles.open(filepath, 'r', encoding='utf-8') as file:
+            data = json.loads(await file.read())
+            user_data_cache[user_id] = data
+            return data
     else:
-        return []
+        initial_data = {'history': [], 'model': os.getenv("MODEL")}
+        await save_user_data(user_id, initial_data)
+        user_data_cache[user_id] = initial_data
+        return initial_data
 
-def save_user_history(user_id, history):
-    filepath = get_user_data_filepath(user_id)
-    with open(filepath, 'w', encoding='utf-8') as file:
-        json.dump({'history': history}, file, ensure_ascii=False, indent=4)
+async def save_user_data(user_id, data):
+    filepath = await get_user_data_filepath(user_id)
+    async with aiofiles.open(filepath, 'w', encoding='utf-8') as file:
+        await file.write(json.dumps(data, ensure_ascii=False, indent=4))
+    user_data_cache[user_id] = data
 
-discordClient = discordClient()
+discordClient = DiscordClient()
