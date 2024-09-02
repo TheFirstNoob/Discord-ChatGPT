@@ -1,6 +1,6 @@
 # English | [Русский](README.md)
 
-# Discord ChatGPT Bot
+# Discord ChatGPT Bot (Used gpt4free provider libs)
 ## All providers are operational and tested in the RU region. Your experience may vary!
 ## Works correctly on Python version 3.11.5
 
