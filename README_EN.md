@@ -18,6 +18,7 @@
 * Support for SDXL and FLUX models for image generation
 * Support for "memory" for each user that does not reset upon bot restart
 * Memory `/reset` works individually for users, not globally (none)
+* Saving the used AI model for each user individually
 
 -----
 
