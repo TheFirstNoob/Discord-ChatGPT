@@ -20,6 +20,8 @@ from g4f.Provider import (
 from src.aclient import discordClient
 from discord import app_commands
 
+client = Client()
+
 def load_user_data(user_id):
     file_path = f'user_data/{user_id}.json'
     
@@ -58,8 +60,6 @@ def run_discord_bot():
             message = combined_message
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] в ({discordClient.current_channel})")
-
-        # Запускаем отправку сообщения с использованием модели пользователя
         await discordClient.enqueue_message(interaction, message)
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
@@ -79,7 +79,6 @@ def run_discord_bot():
         app_commands.Choice(name="LLaMa v3.1 405B", value="llama-3.1-405b"),
         app_commands.Choice(name="LLaMa v3.1 Sonar 128k (Online)", value="llama-3.1-sonar-large-128k-online"),
         app_commands.Choice(name="LLaMa v3.1 Sonar 128k Chat", value="llama-3.1-sonar-large-128k-chat"),
-        app_commands.Choice(name="Qwen Tubro", value="qwen-turbo"),
         app_commands.Choice(name="Pi", value="pi"),
         app_commands.Choice(name="Mixtral-8x7B", value="mixtral-8x7b"),
         app_commands.Choice(name="Mixtral-7B", value="mistral-7b"),
@@ -92,7 +91,6 @@ def run_discord_bot():
 
         user_id = interaction.user.id
         username = str(interaction.user)
-
         discordClient.set_user_model(user_id, model.value)
 
         # GPT4Free libs should take model name automatic
@@ -112,7 +110,6 @@ def run_discord_bot():
             "llama-3.1-405b": RetryProvider([HuggingChat, HuggingFace, Blackbox, Snova], shuffle=False),
             "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
             "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
-            "qwen-turbo": RetryProvider([Bixin123], shuffle=False),
             "pi": RetryProvider([Pi], shuffle=False),
             "mixtral-8x7b": RetryProvider([HuggingChat, HuggingFace, ReplicateHome, TwitterBio, DeepInfra, DDG], shuffle=False),
             "mistral-7b": RetryProvider([HuggingChat, HuggingFace, DeepInfra], shuffle=False),
@@ -124,20 +121,13 @@ def run_discord_bot():
         selected_provider = providers.get(model.value)
         discordClient.chatBot = Client(provider=selected_provider)
 
-        # Вызов стартового промпта при смене модели
-        # Больше не требуется
-        #if model.value not in ["llama-3.1-sonar-large-128k-online", "llama-3.1-sonar-large-128k-chat"]:
-        #    await discordClient.send_start_prompt()
-
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
 
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
 
-        if model.value == "Gemini-Pro":
-            await interaction.followup.send("> :warning: **Провайдеры этой модели могут быть нестабильны и могут отваливаться!**")
-        if model.value == "claude-3-haiku-20240307":
+        if model.value == "claude-3-haiku":
             await interaction.followup.send("> :warning: **Провайдер этой модели не поддерживает историю общения и не имеет памяти. Это особенность провайдера, а не моя ошибка!**")
-        if model.value == "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8":
+        if model.value == "llama-3.1-405b":
             await interaction.followup.send("> :warning: **Генерация ответов от этой модели может быть долгой. Данная модель требует больших ресурсов для генерации!**")
         if model.value == "pi":
             await interaction.followup.send("> :warning: **Ответы от этой модели могут долго приходить, провайдеру нужно что-то типо проснуться для инициализации!**")
@@ -236,103 +226,70 @@ def run_discord_bot():
         
         await interaction.followup.send(changelog_text)
         logger.info(f"\x1b[31m{username} запросил(а) журнал изменений для версии {version.name} бота\x1b[0m")
-
+    
     @discordClient.tree.command(name="draw", description="Сгенерировать изображение от модели ИИ")
-    @app_commands.describe(prompt="Описание изображения", service="Выберите сервис", height="Высота изображения", width="Ширина изображения")
+    @app_commands.describe(prompt="Описание изображения", service="Выберите сервис")
     @app_commands.choices(service=[
-        app_commands.Choice(name="SDXL DeepInfra", value="sdxl"),
-        app_commands.Choice(name="FLUX DeepInfra", value="flux"),
+        app_commands.Choice(name="SDXL", value="sdxl"),
+        app_commands.Choice(name="SD v3", value="sd-3"),
+        app_commands.Choice(name="Playground v2.5", value="playground-v2.5"),
+        app_commands.Choice(name="FLUX", value="flux"),
+        app_commands.Choice(name="FLUX Realism", value="flux-realism"),
+        app_commands.Choice(name="FLUX Anime", value="flux-anime"),
+        app_commands.Choice(name="FLUX 3D", value="flux-3d"),
+        app_commands.Choice(name="FLUX Disney", value="flux-disney"),
+        app_commands.Choice(name="DALL-E", value="dalle"),
+        app_commands.Choice(name="DALL-E Mini", value="dalle-mini"),
+        app_commands.Choice(name="EMI", value="emi"),
     ])
-    async def draw(interaction: discord.Interaction, prompt: str, service: app_commands.Choice[str], height: Optional[int] = 1024, width: Optional[int] = 1024):
-        if service.value == "flux":
-            # Проверка для модели FLUX
-            if height is None or width is None or height < 256 or height > 1440 or width < 256 or width > 1440:
-                await interaction.response.send_message("**Ошибка:** Высота и ширина изображения для модели FLUX поддерживают от 256 до 1440 пикселей. Мы установили стандартное значение 1024 на 1024, чтобы вы все равно могли посмотреть результат.")
-                height = 1024
-                width = 1024
-
-        else:
-            # Проверка для других моделей
-            if height is not None and (height < 128 or height > 1920) or width is not None and (width < 128 or width > 1920):
-                await interaction.response.send_message("**Ошибка:** Высота и ширина изображения для данной модели поддерживают от 128 до 1920 пикселей. Мы установили стандартное значение 1024 на 1024, чтобы вы все равно могли посмотреть результат.")
-                height = 1024
-                width = 1024
-            if (height is not None and height % 8 != 0) or (width is not None and width % 8 != 0):
-                await interaction.response.send_message("**Ошибка:** Высота и Ширина изображения должны быть кратны/делимы на 8.")
-                return
-
+    
+    async def draw(interaction: discord.Interaction, prompt: str, service: app_commands.Choice[str]):
         if interaction.user == discordClient.user:
             return
+
+        # Проверка на недоступные модели
+        unavailable_models = ["dalle", "dalle-mini", "emi"]
+        if service.value in unavailable_models:
+            await interaction.response.send_message("> **Ошибка:** Эта модель в данный момент не работает. Base64 decoding format error.", ephemeral=True)
+            return
+
+        all_flux_models = ["flux", "flux-realism", "flux-anime", "flux-3d", "flux-disney"]
+        if service.value in all_flux_models:
+            await interaction.response.send_message("> :warning: **Все модели FLUX могут повторять изображения при одинаковых запросах**")
 
         username = str(interaction.user)
         channel = str(interaction.channel)
         logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{service.value}]")
 
-        await interaction.response.defer(thinking=True)
-
-        image_url = None
         try:
-            headers = {
-                "Authorization": f"Bearer {os.environ.get('DEEPINFRA_API_KEY')}"
-            }
+            await interaction.response.defer()
 
-            # Используем URL изображения в ответе
-            if service.value == "sdxl":
-                model = "stability-ai/sdxl"
-                data = {
-                    "input": {
-                        "prompt": prompt,
-                        "height": height,
-                        "width": width
-                    }
-                }
-                response = requests.post('https://api.deepinfra.com/v1/inference/stability-ai/sdxl', json=data, headers=headers)
-                response.raise_for_status()
+            response = await asyncio.to_thread(client.images.generate, 
+                                                model=service.value, 
+                                                prompt=prompt)
 
-                response_json = response.json()
-                if "error" in response_json and response_json["error"]:
-                    error_message = response_json["error"]
-                    await interaction.followup.send(f"**Ошибка:** {error_message}")
+            if response.data:
+                image_url = response.data[0].url
+                
+                # Сохранение изображения (Discord долго порой конвертирует ссылки на изображение поэтому быстре сохранить и отправить)
+                image_response = requests.get(image_url)
+                if image_response.status_code == 200:
+                    image_path = f"temp_image_{interaction.user.id}.png"
+                    with open(image_path, 'wb') as f:
+                        f.write(image_response.content)
+
+                    with open(image_path, 'rb') as f:
+                        model_message = f":paintbrush: **Изображение от модели**: {service.value}"
+                        await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
+
+                    # Удаляем временный файл
+                    #os.remove(image_path)
                 else:
-                    image_urls = response_json.get("output", [])
-                    if image_urls:
-                        image_url = image_urls[0]
-                        await interaction.followup.send(image_url)
-
-            # Используем base64 в ответе
-            elif service.value == "flux":
-                model = "black-forest-labs/FLUX-1-schnell"
-                data = {
-                    'prompt': prompt,
-                }
-                response = requests.post('https://api.deepinfra.com/v1/inference/black-forest-labs/FLUX-1-schnell', headers=headers, json=data)
-                response.raise_for_status()
-
-                response_json = response.json()
-                if "error" in response_json and response_json["error"]:
-                    error_message = response_json["error"]
-                    await interaction.followup.send(f"**Ошибка:** {error_message}")
-                else:
-                    image_urls = response_json.get("images", [])
-                    if image_urls:
-                        base64_image = image_urls[0].split(",")[1]
-                        image_data = base64.b64decode(base64_image)
-
-                        # Генерация уникального имени файла
-                        unique_filename = f'generated_image_{uuid.uuid4().hex}.png'
-                        image_path = unique_filename
-                        with open(image_path, 'wb') as image_file:
-                            image_file.write(image_data)
-                        await interaction.followup.send(file=discord.File(image_path))
-
-                        # Удаление файла после отправки
-                        os.remove(image_path)
-                    else:
-                        await interaction.followup.send("**Ошибка:** Изображение не было сгенерировано.")
-
-        except Exception as err:
-            await interaction.followup.send(f'> **Ошибка:** {err}')
-            logger.error(f"\x1b[31m{username}\x1b[0m : {err}")
+                    await interaction.followup.send("> **Ошибка:** Не удалось загрузить изображение.")
+            else:
+                await interaction.followup.send("> **Ошибка:** Не удалось сгенерировать изображение.")
+        except Exception as e:
+            await interaction.followup.send(f"> **Ошибка:** Произошла ошибка: {str(e)}")
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
