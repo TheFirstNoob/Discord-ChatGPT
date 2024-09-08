@@ -251,10 +251,6 @@ def run_discord_bot():
             await interaction.response.send_message("> **Ошибка:** Эта модель в данный момент не работает. Base64 decoding format error.", ephemeral=True)
             return
 
-        all_flux_models = ["flux", "flux-realism", "flux-anime", "flux-3d", "flux-disney"]
-        if service.value in all_flux_models:
-            await interaction.response.send_message("> :warning: **Все модели FLUX могут повторять изображения при одинаковых запросах**")
-
         username = str(interaction.user)
         channel = str(interaction.channel)
         logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{service.value}]")
@@ -287,7 +283,7 @@ def run_discord_bot():
             else:
                 await interaction.followup.send("> **Ошибка:** Не удалось сгенерировать изображение.")
         except Exception as e:
-            await interaction.followup.send(f"> **Ошибка:** Произошла ошибка: {str(e)}")
+            await interaction.followup.send(f"> **Ошибка:** {str(e)}")
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
