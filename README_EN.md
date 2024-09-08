@@ -14,10 +14,10 @@
 # Differences from the original version
 ## The main difference is the support for conversation history for each user separately
 
-* A larger number of chat models using the **gpt4free** library: https://github.com/xtekky/gpt4free
-* Support for SDXL and FLUX models for image generation
+* A larger number of AI chat models using the **gpt4free** library: https://github.com/xtekky/gpt4free
+* A larger number of image generation AI models using the **gpt4free** library
 * Support for "memory" for each user that does not reset upon bot restart
-* Memory `/reset` works individually for users, not globally (none)
+* Memory `/reset` works individually for users, not globally (system)
 * Saving the used AI model for each user individually
 
 -----
@@ -48,9 +48,7 @@ Download build bot: https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs
 7. Invite the bot to your Discord server
 8. Create a system chat channel and right-click to copy the channel ID
 9. Insert the Channel ID into `.env` in the line: `DISCORD_CHANNEL_ID`
-10. Go to https://deepinfra.com/dash/api_keys and create your API key
-11. Insert the DeepInfra API key into `.env` in the line `DEEPINFRA_API_KEY`
-12. Customize the starting prompt to your liking in the `system_prompt.txt` file
+10. Customize the starting prompt to your liking in the `system_prompt.txt` file
 -----
 ## Running the bot on Windows
 * If your IDE is correctly set up, simply double-click `main.py` to run it
@@ -63,12 +61,12 @@ Download build bot: https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs
 
 **MAIN:**
 1. `/ask {prompt} {Additional query}`: Chat with AI (a separate memory of your queries is created in DMs)
-2. `/draw {prompt} {Service}`: Create an image using the SDXL or FLUX model
+2. `/draw {prompt} {Service}`: Create an image using the AI models
 
 **INFORMATION:**
 1. `/help`: Display information on how to use Hitagi ChatGPT (shows a list of commands)
 2. `/modelinfo`: Display information about a specific model (includes my examples)
-3. `/info`: Display information about the Hitagi ChatGPT project (includes my example)
+3. `/about`: Display information about the Hitagi ChatGPT project (includes my example)
 4. `/changelog`: Display information about changes in a specific version (includes my examples)
 
 **MANAGEMENT:**
