@@ -4,8 +4,6 @@ import json
 import asyncio
 import discord
 import requests
-import base64
-import uuid
 from src.log import logger, setup_logger
 from typing import Optional
 
@@ -283,7 +281,7 @@ def run_discord_bot():
                         await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
 
                     # Удаляем временный файл
-                    #os.remove(image_path)
+                    os.remove(image_path)
                 else:
                     await interaction.followup.send("> **Ошибка:** Не удалось загрузить изображение.")
             else:
