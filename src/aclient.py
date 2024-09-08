@@ -135,7 +135,6 @@ class DiscordClient(discord.Client):
             "llama-3.1-405b": RetryProvider([HuggingChat, HuggingFace, Blackbox, Snova], shuffle=False),
             "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
             "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
-            "qwen-turbo": RetryProvider([Bixin123], shuffle=False),
             "pi": RetryProvider([Pi], shuffle=False),
             "mixtral-8x7b": RetryProvider([HuggingChat, HuggingFace, ReplicateHome, TwitterBio, DeepInfra, DDG], shuffle=False),
             "mistral-7b": RetryProvider([HuggingChat, HuggingFace, DeepInfra], shuffle=False),
@@ -145,7 +144,7 @@ class DiscordClient(discord.Client):
         }
 
         return providers.get(model, self.default_provider)
-#this all need to be async for perfomance but have some problems with dict...
+
     def reset_conversation_history(self, user_id: int):
         self.save_user_data(user_id, {'history': [], 'model': self.default_model})
 
