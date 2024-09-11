@@ -117,6 +117,16 @@ class DiscordClient(discord.Client):
         self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
 
         return f"{model_response}\n\n{bot_response}"
+        
+    async def download_conversation_history(self, user_id: int) -> str:
+        if user_id is None:
+            filepath = os.path.join(USER_DATA_DIR, 'system.json')
+        else:
+            filepath = os.path.join(USER_DATA_DIR, f'{user_id}.json')
+        
+        if os.path.exists(filepath):
+            return filepath
+        return None
 
     def get_provider_for_model(self, model: str):
         providers = {

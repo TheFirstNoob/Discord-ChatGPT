@@ -224,6 +224,22 @@ def run_discord_bot():
         
         await interaction.followup.send(changelog_text)
         logger.info(f"\x1b[31m{username} запросил(а) журнал изменений для версии {version.name} бота\x1b[0m")
+        
+    @discordClient.tree.command(name="history", description="Получить историю сообщений")
+    async def history(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+
+        if interaction.user == discordClient.user:
+            return
+
+        user_id = interaction.user.id
+        filepath = await discordClient.download_conversation_history(user_id)
+
+        if filepath:
+            with open(filepath, 'rb') as file:
+                await interaction.followup.send(file=discord.File(file, filename=f'{user_id}_history.json'))
+        else:
+            await interaction.followup.send("История сообщений не найдена.")
     
     @discordClient.tree.command(name="draw", description="Сгенерировать изображение от модели ИИ")
     @app_commands.describe(prompt="Описание изображения", service="Выберите сервис")
