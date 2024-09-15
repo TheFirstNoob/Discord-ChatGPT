@@ -19,6 +19,7 @@
 * Support for "memory" for each user that does not reset upon bot restart
 * Memory `/reset` works individually for users, not globally (system)
 * Saving the used AI model for each user individually
+* Download conversation history for each user individually
 
 -----
 
@@ -72,3 +73,4 @@ Download build bot: https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs
 **MANAGEMENT:**
 1. `/reset`: Reset your conversation history
 2. `/chat-model {AI model}`: Change the chat model
+3. `/download`: Download your conversation history
