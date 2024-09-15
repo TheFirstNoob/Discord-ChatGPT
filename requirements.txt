@@ -4,5 +4,5 @@ asgiref==3.8.1
 selenium==4.24.0
 openai==1.43.0
 aiofiles==24.1.0
-g4f==0.3.2.6
+g4f==0.3.2.7
 g4f[all]
