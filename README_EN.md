@@ -73,4 +73,4 @@ Download build bot: https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs
 **MANAGEMENT:**
 1. `/reset`: Reset your conversation history
 2. `/chat-model {AI model}`: Change the chat model
-3. `/download`: Download your conversation history
+3. `/history`: Download your conversation history
