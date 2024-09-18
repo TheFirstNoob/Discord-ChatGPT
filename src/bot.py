@@ -20,16 +20,9 @@ from discord import app_commands
 
 client = Client()
 
-def load_user_data(user_id):
-    file_path = f'user_data/{user_id}.json'
-    
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as file:
-            return json.load(file)
-    else:
-        return {}
-
-def run_discord_bot():
+# ??? Я не совсем уверен что это хорошая идея тут делать async, но вроде все ок :D
+# Нужно больше тестов или ответ более опытного программера
+async def run_discord_bot():
     @discordClient.event
     async def on_ready():
         await discordClient.send_start_prompt()
@@ -49,7 +42,7 @@ def run_discord_bot():
         discordClient.current_channel = interaction.channel
 
         user_id = interaction.user.id
-        user_data = load_user_data(user_id)
+        user_data = await discordClient.load_user_data(user_id)
         user_model = user_data.get('model', discordClient.default_model)
 
         if additionalmessage:
@@ -90,8 +83,7 @@ def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
 
         user_id = interaction.user.id
-        username = str(interaction.user)
-        discordClient.set_user_model(user_id, model.value)
+        await discordClient.set_user_model(user_id, model.value)
 
         providers = {
             "gpt-3.5-turbo": RetryProvider([FreeChatgpt, FreeNetfly, Bixin123, Nexra, TwitterBio, Airforce], shuffle=False),
@@ -140,7 +132,7 @@ def run_discord_bot():
     async def reset(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
-        discordClient.reset_conversation_history(user_id)
+        await discordClient.reset_conversation_history(user_id)
         await discordClient.send_start_prompt()
         await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Ваша история и модели ИИ сброшены!")
         logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю.\x1b[0m")
@@ -298,4 +290,4 @@ def run_discord_bot():
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-    discordClient.run(TOKEN)
+    await discordClient.start(TOKEN)

@@ -2,6 +2,7 @@ import os
 import json
 import discord
 import asyncio
+import aiofiles
 from dotenv import load_dotenv
 from src.log import logger, setup_logger
 from utils.message_utils import send_split_message
@@ -53,15 +54,14 @@ class DiscordClient(discord.Client):
     async def process_messages(self):
         while True:
             if self.current_channel is not None:
+                tasks = []
                 while not self.message_queue.empty():
                     async with self.current_channel.typing():
                         message, user_message = await self.message_queue.get()
-                        try:
-                            await self.send_message(message, user_message)
-                        except Exception as e:
-                            logger.exception(f"Ошибка при обработке сообщения: {e}")
-                        finally:
-                            self.message_queue.task_done()
+                        tasks.append(self.send_message(message, user_message))
+                        self.message_queue.task_done()
+                if tasks:
+                    await asyncio.gather(*tasks)  # Параллельная обработка сообщений
             await asyncio.sleep(1)
 
     async def enqueue_message(self, message, user_message):
@@ -94,7 +94,7 @@ class DiscordClient(discord.Client):
             logger.exception(f"Ошибка при отправке промта: {e}")
 
     async def handle_response(self, user_id: int, user_message: str) -> str:
-        user_data = self.load_user_data(user_id)
+        user_data = await self.load_user_data(user_id)
         conversation_history = user_data.get('history', [])
         user_model = user_data.get('model', self.default_model)
 
@@ -103,7 +103,7 @@ class DiscordClient(discord.Client):
         if len(conversation_history) > self.max_history_length:
             conversation_history = conversation_history[3:]  # Удаляем по 3 первых сообщения при переполении памяти
 
-        selected_provider = self.get_provider_for_model(user_model)
+        selected_provider = await self.get_provider_for_model(user_model)
         self.default_provider = selected_provider 
         self.chatBot = Client(provider=selected_provider)
 
@@ -114,7 +114,7 @@ class DiscordClient(discord.Client):
         bot_response = response.choices[0].message.content
         conversation_history.append({'role': 'assistant', 'content': bot_response})
 
-        self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
+        await self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
 
         return f"{model_response}\n\n{bot_response}"
         
@@ -128,7 +128,7 @@ class DiscordClient(discord.Client):
             return filepath
         return None
 
-    def get_provider_for_model(self, model: str):
+    async def get_provider_for_model(self, model: str):
         providers = {
             "gpt-3.5-turbo": RetryProvider([FreeChatgpt, FreeNetfly, Bixin123, Nexra, TwitterBio, Airforce], shuffle=False),
             "gpt-4": RetryProvider([Chatgpt4Online, Nexra, Binjie, FreeNetfly, AiChats, Airforce, You, Liaobots], shuffle=False),
@@ -157,39 +157,38 @@ class DiscordClient(discord.Client):
 
         return providers.get(model, self.default_provider)
 
-    def reset_conversation_history(self, user_id: int):
-        self.save_user_data(user_id, {'history': [], 'model': self.default_model})
+    async def reset_conversation_history(self, user_id: int):
+        await self.save_user_data(user_id, {'history': [], 'model': self.default_model})
 
-    def set_user_model(self, user_id: int, model_name: str):
-        user_data = self.load_user_data(user_id)
+    async def set_user_model(self, user_id: int, model_name: str):
+        user_data = await self.load_user_data(user_id)
         user_data['model'] = model_name
-        self.save_user_data(user_id, user_data)
+        await self.save_user_data(user_id, user_data)
 
-    def get_user_data_filepath(self, user_id):
+    async def get_user_data_filepath(self, user_id):
         if user_id is None:
             return os.path.join(USER_DATA_DIR, 'system.json')
         return os.path.join(USER_DATA_DIR, f'{user_id}.json')
 
-    def load_user_data(self, user_id):
+    async def load_user_data(self, user_id):
         if user_id in user_data_cache:
             return user_data_cache[user_id]
 
-        filepath = self.get_user_data_filepath(user_id)
+        filepath = await self.get_user_data_filepath(user_id)
         if os.path.exists(filepath):
-            with open(filepath, 'r', encoding='utf-8') as file:
-                data = json.load(file)
-                user_data_cache[user_id] = data
-                return data
+            async with aiofiles.open(filepath, 'r', encoding='utf-8') as file:
+                data = await file.read()
+                user_data_cache[user_id] = json.loads(data)
+                return user_data_cache[user_id]
         else:
             initial_data = {'history': [], 'model': os.getenv("MODEL")}
-            self.save_user_data(user_id, initial_data)
-            user_data_cache[user_id] = initial_data
+            await self.save_user_data(user_id, initial_data)
             return initial_data
 
-    def save_user_data(self, user_id, data):
-        filepath = self.get_user_data_filepath(user_id)
-        with open(filepath, 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=4)
+    async def save_user_data(self, user_id, data):
+        filepath = await self.get_user_data_filepath(user_id)
+        async with aiofiles.open(filepath, 'w', encoding='utf-8') as file:
+            await file.write(json.dumps(data, ensure_ascii=False, indent=4))
         user_data_cache[user_id] = data
 
 discordClient = DiscordClient()
