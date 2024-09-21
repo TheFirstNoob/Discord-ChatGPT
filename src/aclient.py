@@ -7,14 +7,13 @@ from dotenv import load_dotenv
 from src.log import logger, setup_logger
 from utils.message_utils import send_split_message
 from discord import app_commands
-from asgiref.sync import sync_to_async
 import g4f.debug
-from g4f.client import Client
+from g4f.client import AsyncClient
 from g4f.stubs import ChatCompletion
 from g4f.Provider import (
-    AiChatOnline, AiChats, Blackbox, Airforce, Bixin123, Binjie, CodeNews, ChatGot, Chatgpt4o, ChatgptFree, Chatgpt4Online,
-    DDG, DeepInfra, DeepInfraImage, FreeChatgpt, FreeGpt, Free2GPT, FreeNetfly, Koala, HuggingChat, HuggingFace, Nexra,
-    ReplicateHome, Liaobots, LiteIcoding, MagickPen, Prodia, PerplexityLabs, Pi, TeachAnything, TwitterBio, Snova, You,
+    Airforce, Blackbox, Bixin123, Binjie, ChatGot, Chatgpt4o, ChatgptFree,
+    DDG, DeepInfraImage, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra,
+    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
     Pizzagpt, RetryProvider
 )
 
@@ -27,6 +26,22 @@ USER_DATA_DIR = 'user_data'
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 
+class RetryProvider:
+    def __init__(self, providers, shuffle=False):
+        self.providers = providers
+        self.shuffle = shuffle
+        self.current_index = 0
+
+    def get_next_provider(self):
+        if self.current_index >= len(self.providers):
+            raise Exception("All providers failed")
+        provider = self.providers[self.current_index]
+        self.current_index += 1
+        return provider
+
+    def reset(self):
+        self.current_index = 0
+
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
         intents = discord.Intents.default()
@@ -37,8 +52,8 @@ class DiscordClient(discord.Client):
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
 
-        self.default_provider = RetryProvider([Pizzagpt, AiChatOnline, ChatgptFree, CodeNews, You, FreeNetfly, Koala, MagickPen, DDG, Liaobots], shuffle=False)
-        self.chatBot = Client(provider=self.default_provider)
+        self.default_provider = RetryProvider([Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots], shuffle=False)
+        self.chatBot = AsyncClient(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
 
@@ -103,12 +118,18 @@ class DiscordClient(discord.Client):
         if len(conversation_history) > self.max_history_length:
             conversation_history = conversation_history[3:]  # Удаляем по 3 первых сообщения при переполении памяти
 
-        selected_provider = await self.get_provider_for_model(user_model)
-        self.default_provider = selected_provider 
-        self.chatBot = Client(provider=selected_provider)
-
-        async_create = sync_to_async(self.chatBot.chat.completions.create, thread_sensitive=True)
-        response: ChatCompletion = await async_create(model=user_model, messages=conversation_history)
+        retry_provider = await self.get_provider_for_model(user_model)
+        retry_provider.reset()
+        while True:
+            try:
+                provider = retry_provider.get_next_provider()
+                self.chatBot = AsyncClient(provider=provider)
+                response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
+                break
+            except Exception as e:
+                # Логируем ошибку и пробуем следующего провайдера
+                print(f"Error with provider {provider}: {e}")
+                continue
 
         model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия Hitagi ChatGPT:** *{os.environ.get('VERSION_BOT')}*"
         bot_response = response.choices[0].message.content
@@ -128,34 +149,37 @@ class DiscordClient(discord.Client):
             return filepath
         return None
 
-    async def get_provider_for_model(self, model: str):
-        providers = {
-            "gpt-3.5-turbo": RetryProvider([FreeChatgpt, FreeNetfly, Bixin123, Nexra, TwitterBio, Airforce], shuffle=False),
-            "gpt-4": RetryProvider([Chatgpt4Online, Nexra, Binjie, FreeNetfly, AiChats, Airforce, You, Liaobots], shuffle=False),
-            "gpt-4-turbo": RetryProvider([Nexra, Bixin123, Airforce, You, Liaobots], shuffle=False),
-            "gpt-4o-mini": RetryProvider([Pizzagpt, AiChatOnline, ChatgptFree, CodeNews, You, FreeNetfly, Koala, MagickPen, Airforce, DDG, Liaobots], shuffle=False),
-            "gpt-4o": RetryProvider([Chatgpt4o, LiteIcoding, AiChatOnline, Airforce, You, Liaobots], shuffle=False),
-            "claude-3-haiku": RetryProvider([DDG, Liaobots], shuffle=False),
-            "blackbox": RetryProvider([Blackbox], shuffle=False),
-            "gemini-flash": RetryProvider([Blackbox, Liaobots], shuffle=False),
-            "gemini-pro": RetryProvider([ChatGot, Liaobots], shuffle=False),
-            "gemma-2b": RetryProvider([ReplicateHome], shuffle=False),
-            "command-r-plus": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
-            "llama-3.1-70b": RetryProvider([HuggingChat, HuggingFace, Blackbox, DeepInfra, FreeGpt, TeachAnything, Free2GPT, Snova, DDG], shuffle=False),
-            "llama-3.1-405b": RetryProvider([Blackbox, Snova], shuffle=False),
-            "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
-            "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
-            "pi": RetryProvider([Pi], shuffle=False),
-            "qwen-turbo": RetryProvider([Bixin123], shuffle=False),
-            "qwen-2-72b": RetryProvider([Airforce], shuffle=False),
-            "mixtral-8x7b": RetryProvider([HuggingChat, HuggingFace, ReplicateHome, TwitterBio, DeepInfra, DDG], shuffle=False),
-            "mixtral-8x7b-dpo": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
-            "mistral-7b": RetryProvider([HuggingChat, HuggingFace, DeepInfra], shuffle=False),
-            "yi-1.5-9b": RetryProvider([FreeChatgpt], shuffle=False),
-            "SparkDesk-v1.1": RetryProvider([FreeChatgpt], shuffle=False),
+    def _initialize_providers(self):
+        return {
+            # Chat providers
+            "gpt-3.5-turbo": [FreeChatgpt, Nexra],
+            "gpt-4": [Nexra, Binjie, Airforce, Liaobots],
+            "gpt-4-turbo": [Nexra, Airforce, Liaobots],
+            "gpt-4o-mini": [Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots],
+            "gpt-4o": [LiteIcoding, Airforce, Liaobots],
+            "claude-3-haiku": [ DDG, Liaobots],
+            "blackbox": [Blackbox],
+            "gemini-flash": [Blackbox, Liaobots],
+            "gemini-pro": [ChatGot, Liaobots],
+            "gemma-2b": [ReplicateHome],
+            "command-r-plus": [HuggingChat],
+            "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, DDG],
+            "llama-3.1-405b": [Blackbox],
+            "llama-3.1-sonar-large-128k-online": [PerplexityLabs],
+            "llama-3.1-sonar-large-128k-chat": [PerplexityLabs],
+            "qwen-turbo": [Bixin123],
+            "qwen-2-72b": [Airforce],
+            "mixtral-8x7b": [HuggingChat, ReplicateHome, DDG],
+            "mixtral-8x7b-dpo": [HuggingChat],
+            "mistral-7b": [HuggingChat],
+            "yi-1.5-9b": [FreeChatgpt],
+            "SparkDesk-v1.1": [FreeChatgpt],
         }
 
-        return providers.get(model, self.default_provider)
+    async def get_provider_for_model(self, model: str):
+        providers_dict = self._initialize_providers()
+        providers = providers_dict.get(model, self.default_provider)
+        return RetryProvider(providers, shuffle=False)
 
     async def reset_conversation_history(self, user_id: int):
         await self.save_user_data(user_id, {'history': [], 'model': self.default_model})

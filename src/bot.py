@@ -9,9 +9,9 @@ from typing import Optional
 
 from g4f.client import Client
 from g4f.Provider import (
-    AiChatOnline, AiChats, Blackbox, Airforce, Bixin123, Binjie, CodeNews, ChatGot, Chatgpt4o, ChatgptFree, Chatgpt4Online,
-    DDG, DeepInfra, DeepInfraImage, FreeChatgpt, FreeGpt, Free2GPT, FreeNetfly, Koala, HuggingChat, HuggingFace, Nexra,
-    ReplicateHome, Liaobots, LiteIcoding, MagickPen, Prodia, PerplexityLabs, Pi, TeachAnything, TwitterBio, Snova, You,
+    Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree,
+    DDG, DeepInfraImage, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra,
+    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
     Pizzagpt, RetryProvider
 )
 
@@ -20,8 +20,6 @@ from discord import app_commands
 
 client = Client()
 
-# ??? Я не совсем уверен что это хорошая идея тут делать async, но вроде все ок :D
-# Нужно больше тестов или ответ более опытного программера
 async def run_discord_bot():
     @discordClient.event
     async def on_ready():
@@ -85,44 +83,18 @@ async def run_discord_bot():
         user_id = interaction.user.id
         await discordClient.set_user_model(user_id, model.value)
 
-        providers = {
-            "gpt-3.5-turbo": RetryProvider([FreeChatgpt, FreeNetfly, Bixin123, Nexra, TwitterBio, Airforce], shuffle=False),
-            "gpt-4": RetryProvider([Chatgpt4Online, Nexra, Binjie, FreeNetfly, AiChats, Airforce, You, Liaobots], shuffle=False),
-            "gpt-4-turbo": RetryProvider([Nexra, Bixin123, Airforce, You, Liaobots], shuffle=False),
-            "gpt-4o-mini": RetryProvider([Pizzagpt, AiChatOnline, ChatgptFree, CodeNews, You, FreeNetfly, Koala, MagickPen, Airforce, DDG, Liaobots], shuffle=False),
-            "gpt-4o": RetryProvider([Chatgpt4o, LiteIcoding, AiChatOnline, Airforce, You, Liaobots], shuffle=False),
-            "claude-3-haiku": RetryProvider([DDG, Liaobots], shuffle=False),
-            "blackbox": RetryProvider([Blackbox], shuffle=False),
-            "gemini-flash": RetryProvider([Blackbox, Liaobots], shuffle=False),
-            "gemini-pro": RetryProvider([ChatGot, Liaobots], shuffle=False),
-            "gemma-2b": RetryProvider([ReplicateHome], shuffle=False),
-            "command-r-plus": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
-            "llama-3.1-70b": RetryProvider([HuggingChat, HuggingFace, Blackbox, DeepInfra, FreeGpt, TeachAnything, Free2GPT, Snova, DDG], shuffle=False),
-            "llama-3.1-405b": RetryProvider([Blackbox, Snova], shuffle=False),
-            "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
-            "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
-            "pi": RetryProvider([Pi], shuffle=False),
-            "qwen-turbo": RetryProvider([Bixin123], shuffle=False),
-            "qwen-2-72b": RetryProvider([Airforce], shuffle=False),
-            "mixtral-8x7b": RetryProvider([HuggingChat, HuggingFace, ReplicateHome, TwitterBio, DeepInfra, DDG], shuffle=False),
-            "mixtral-8x7b-dpo": RetryProvider([HuggingChat, HuggingFace], shuffle=False),
-            "mistral-7b": RetryProvider([HuggingChat, HuggingFace, DeepInfra], shuffle=False),
-            "yi-1.5-9b": RetryProvider([FreeChatgpt], shuffle=False),
-            "SparkDesk-v1.1": RetryProvider([FreeChatgpt], shuffle=False),
-        }
-
-        selected_provider = providers.get(model.value)
-        discordClient.chatBot = Client(provider=selected_provider)
+        selected_provider = await discordClient.get_provider_for_model(model.value)
+        discordClient.chatBot = AsyncClient(provider=selected_provider)
 
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
 
         if model.value == "claude-3-haiku":
             await interaction.followup.send("> :warning: **Провайдер этой модели не поддерживает историю общения и не имеет памяти. Это особенность провайдера, а не моя ОШИБКА!**")
-        if model.value == "llama-3.1-405b":
+        elif model.value == "llama-3.1-405b":
             await interaction.followup.send("> :warning: **Генерация ответов от этой модели может быть долгой. Данная модель требует больших ресурсов для генерации!**")
-        if model.value == "pi":
+        elif model.value == "pi":
             await interaction.followup.send("> :warning: **Ответы от этой модели могут долго приходить, провайдеру нужно что-то типо проснуться для инициализации!**")
-        if model.value == "llama-3.1-sonar-large-128k-online":
+        elif model.value == "llama-3.1-sonar-large-128k-online":
             await interaction.followup.send("> :warning: **Эта модель имеет доступ в интернет для поиска, но не поддерживает контекст диалога и, вроде как, не имеет памяти!**")
             await interaction.followup.send("> :warning: **Эта модель пока что работает нестабильно**")
 
@@ -150,7 +122,7 @@ async def run_discord_bot():
             help_text = file.read()
         await interaction.followup.send(help_text)
         logger.info(f"\x1b[31m{username} использовал(а) команду help!\x1b[0m")
-        
+
     @discordClient.tree.command(name="about", description="Информация о боте")
     async def about_command(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -164,32 +136,34 @@ async def run_discord_bot():
             about_text = file.read().format(username=username)
         await interaction.followup.send(about_text)
         logger.info(f"\x1b[31m{username} использовал(а) команду about!\x1b[0m")
-        
+
     @discordClient.tree.command(name="modelinfo", description="Информация о моделях чата")
     @app_commands.choices(model=[
         app_commands.Choice(name="Blackbox", value="blackbox"),
-        app_commands.Choice(name="Gemini", value="gemini-Pro"),
+        app_commands.Choice(name="Gemini", value="gemini-pro"),
         app_commands.Choice(name="Command R+", value="command-r-plus"),
     ])
     async def modelinfo(interaction: discord.Interaction, model: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
-        username = str(interaction.user)
-        model_name = model.name
-        model_file = f"texts/model_info/{re.sub(r'[^a-zA-Z0-9_]', '_', model_name.lower())}.txt"
-        
-        if not os.path.exists(model_file):
-            await interaction.followup.send(f"> :x: **ОШИБКА: Файл описания для модели {model_name} не найден! Пожалуйста, свяжитесь с (Ваше имя) и сообщите ему об этой ошибке, возможно он еще не добавил информацию об этой модели.**")
-            logger.error(f"Файл описания для модели {model_name} не найден: {model_file}")
+        model_value = model.value
+        model_file = f"texts/model_info/{re.sub(r'[^a-zA-Z0-9_]', '_', model_value.lower())}.txt"
+
+        if not os.path.isfile(model_file):
+            await interaction.followup.send(
+                f"> :x: **ОШИБКА: Файл описания для модели {model.name} не найден! Пожалуйста, свяжитесь с (Ваше имя) и сообщите ему об этой ошибке, возможно он еще не добавил информацию об этой модели.**"
+            )
+            logger.error(f"Файл описания для модели {model.name} не найден: {model_file}")
             return
-        
+
         with open(model_file, 'r', encoding='utf-8') as file:
             model_info = file.read()
-        
+
         await interaction.followup.send(model_info)
-        logger.info(f"\x1b[31m{username} запросил(а) информацию о модели {model_name}\x1b[0m")
-        
+        logger.info(f"\x1b[31m{interaction.user} запросил(а) информацию о модели {model.name}\x1b[0m")
+
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="3.2.0", value="3.2.0"),
         app_commands.Choice(name="3.1.1", value="3.1.1"),
         app_commands.Choice(name="3.1.0", value="3.1.0"),
         app_commands.Choice(name="3.0.0", value="3.0.0"),
@@ -220,7 +194,7 @@ async def run_discord_bot():
         
     @discordClient.tree.command(name="history", description="Получить историю сообщений")
     async def history(interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=False)
+        await interaction.response.defer(ephemeral=True)
 
         if interaction.user == discordClient.user:
             return
@@ -277,7 +251,7 @@ async def run_discord_bot():
                         f.write(image_response.content)
 
                     with open(image_path, 'rb') as f:
-                        model_message = f":paintbrush: **Изображение от модели**: {service.value}"
+                        model_message = f":paintbrush: **Изображение от модели**: {service.name}"
                         await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
 
                     os.remove(image_path)
