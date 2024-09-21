@@ -8,9 +8,9 @@ import asyncio
 from asgiref.sync import sync_to_async
 from g4f.client import Client
 from g4f.Provider import (
-    Airforce, Blackbox, Bixin123, Binjie, ChatGot, Chatgpt4o, ChatgptFree,
+    Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree,
     DDG, DeepInfraImage, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra, # Do not delete huggingFace
-    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, Pi, TeachAnything,
+    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
     Pizzagpt, RetryProvider
 )
 
@@ -25,7 +25,7 @@ class AITests(unittest.IsolatedAsyncioTestCase):
             "gpt-4": RetryProvider([Nexra, Binjie, Airforce, Liaobots], shuffle=False),
             "gpt-4-turbo": RetryProvider([Nexra, Airforce, Liaobots], shuffle=False),
             "gpt-4o-mini": RetryProvider([Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots], shuffle=False),
-            "gpt-4o": RetryProvider([Chatgpt4o, LiteIcoding, Airforce, Liaobots], shuffle=False),
+            "gpt-4o": RetryProvider([LiteIcoding, Airforce, Liaobots], shuffle=False),
             "claude-3-haiku": RetryProvider([DDG, Liaobots], shuffle=False),
             "blackbox": RetryProvider([Blackbox], shuffle=False),
             "gemini-flash": RetryProvider([Blackbox, Liaobots], shuffle=False),
@@ -36,7 +36,6 @@ class AITests(unittest.IsolatedAsyncioTestCase):
             "llama-3.1-405b": RetryProvider([Blackbox], shuffle=False),
             "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
             "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
-            "pi": RetryProvider([Pi], shuffle=False),
             "qwen-turbo": RetryProvider([Bixin123], shuffle=False),
             "qwen-2-72b": RetryProvider([Airforce], shuffle=False),
             "mixtral-8x7b": RetryProvider([HuggingChat, ReplicateHome, DDG], shuffle=False),
