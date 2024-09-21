@@ -9,7 +9,7 @@ from asgiref.sync import sync_to_async
 from g4f.client import Client
 from g4f.Provider import (
     Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree,
-    DDG, DeepInfraImage, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra, # Do not delete huggingFace
+    DDG, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra, # Do not delete huggingFace
     ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
     Pizzagpt, RetryProvider
 )
