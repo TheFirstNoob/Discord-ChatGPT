@@ -42,6 +42,35 @@ class RetryProvider:
     def reset(self):
         self.current_index = 0
 
+
+def _initialize_providers():
+    return {
+        # Chat providers
+        "gpt-3.5-turbo": [FreeChatgpt, Nexra],
+        "gpt-4": [Nexra, Binjie, Airforce, Liaobots],
+        "gpt-4-turbo": [Nexra, Airforce, Liaobots],
+        "gpt-4o-mini": [Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots],
+        "gpt-4o": [LiteIcoding, Airforce, Liaobots],
+        "claude-3-haiku": [ DDG, Liaobots],
+        "blackbox": [Blackbox],
+        "gemini-flash": [Blackbox, Liaobots],
+        "gemini-pro": [ChatGot, Liaobots],
+        "gemma-2b": [ReplicateHome],
+        "command-r-plus": [HuggingChat],
+        "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, DDG],
+        "llama-3.1-405b": [Blackbox],
+        "llama-3.1-sonar-large-128k-online": [PerplexityLabs],
+        "llama-3.1-sonar-large-128k-chat": [PerplexityLabs],
+        "qwen-turbo": [Bixin123],
+        "qwen-2-72b": [Airforce],
+        "mixtral-8x7b": [HuggingChat, ReplicateHome, DDG],
+        "mixtral-8x7b-dpo": [HuggingChat],
+        "mistral-7b": [HuggingChat],
+        "yi-1.5-9b": [FreeChatgpt],
+        "SparkDesk-v1.1": [FreeChatgpt],
+    }
+
+
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
         intents = discord.Intents.default()
@@ -149,35 +178,8 @@ class DiscordClient(discord.Client):
             return filepath
         return None
 
-    def _initialize_providers(self):
-        return {
-            # Chat providers
-            "gpt-3.5-turbo": [FreeChatgpt, Nexra],
-            "gpt-4": [Nexra, Binjie, Airforce, Liaobots],
-            "gpt-4-turbo": [Nexra, Airforce, Liaobots],
-            "gpt-4o-mini": [Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots],
-            "gpt-4o": [LiteIcoding, Airforce, Liaobots],
-            "claude-3-haiku": [ DDG, Liaobots],
-            "blackbox": [Blackbox],
-            "gemini-flash": [Blackbox, Liaobots],
-            "gemini-pro": [ChatGot, Liaobots],
-            "gemma-2b": [ReplicateHome],
-            "command-r-plus": [HuggingChat],
-            "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, DDG],
-            "llama-3.1-405b": [Blackbox],
-            "llama-3.1-sonar-large-128k-online": [PerplexityLabs],
-            "llama-3.1-sonar-large-128k-chat": [PerplexityLabs],
-            "qwen-turbo": [Bixin123],
-            "qwen-2-72b": [Airforce],
-            "mixtral-8x7b": [HuggingChat, ReplicateHome, DDG],
-            "mixtral-8x7b-dpo": [HuggingChat],
-            "mistral-7b": [HuggingChat],
-            "yi-1.5-9b": [FreeChatgpt],
-            "SparkDesk-v1.1": [FreeChatgpt],
-        }
-
     async def get_provider_for_model(self, model: str):
-        providers_dict = self._initialize_providers()
+        providers_dict = _initialize_providers()
         providers = providers_dict.get(model, self.default_provider)
         return RetryProvider(providers, shuffle=False)
 
