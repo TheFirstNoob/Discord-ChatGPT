@@ -1,19 +1,12 @@
 import os
 import re
-import json
 import asyncio
 import discord
 import requests
-from src.log import logger, setup_logger
+from src.log import logger
 from typing import Optional
 
-from g4f.client import Client
-from g4f.Provider import (
-    Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree,
-    DDG, DeepInfraImage, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra,
-    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
-    Pizzagpt, RetryProvider
-)
+from g4f.client import Client, AsyncClient
 
 from src.aclient import discordClient
 from discord import app_commands

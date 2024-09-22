@@ -1,18 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 import unittest
 import json
-import asyncio
 
-from asgiref.sync import sync_to_async
-from g4f.client import Client
-from g4f.Provider import (
-    Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree,
-    DDG, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra, # Do not delete huggingFace
-    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
-    Pizzagpt, RetryProvider
-)
+from g4f.client import AsyncClient
+from g4f.Provider import RetryProvider
+
+from src.aclient import _initialize_providers
 
 
 class AITests(unittest.IsolatedAsyncioTestCase):
@@ -20,30 +16,11 @@ class AITests(unittest.IsolatedAsyncioTestCase):
         self.INFO = '\x1b[34;1m'
         self.ERROR = '\x1b[31m'
 
-        self.providers = {
-            "gpt-3.5-turbo": RetryProvider([FreeChatgpt, Nexra], shuffle=False),
-            "gpt-4": RetryProvider([Nexra, Binjie, Airforce, Liaobots], shuffle=False),
-            "gpt-4-turbo": RetryProvider([Nexra, Airforce, Liaobots], shuffle=False),
-            "gpt-4o-mini": RetryProvider([Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots], shuffle=False),
-            "gpt-4o": RetryProvider([LiteIcoding, Airforce, Liaobots], shuffle=False),
-            "claude-3-haiku": RetryProvider([DDG, Liaobots], shuffle=False),
-            "blackbox": RetryProvider([Blackbox], shuffle=False),
-            "gemini-flash": RetryProvider([Blackbox, Liaobots], shuffle=False),
-            "gemini-pro": RetryProvider([ChatGot, Liaobots], shuffle=False),
-            "gemma-2b": RetryProvider([ReplicateHome], shuffle=False),
-            "command-r-plus": RetryProvider([HuggingChat], shuffle=False),
-            "llama-3.1-70b": RetryProvider([HuggingChat, Blackbox, TeachAnything, Free2GPT, DDG], shuffle=False),
-            "llama-3.1-405b": RetryProvider([Blackbox], shuffle=False),
-            "llama-3.1-sonar-large-128k-online": RetryProvider([PerplexityLabs], shuffle=False),
-            "llama-3.1-sonar-large-128k-chat": RetryProvider([PerplexityLabs], shuffle=False),
-            "qwen-turbo": RetryProvider([Bixin123], shuffle=False),
-            "qwen-2-72b": RetryProvider([Airforce], shuffle=False),
-            "mixtral-8x7b": RetryProvider([HuggingChat, ReplicateHome, DDG], shuffle=False),
-            "mixtral-8x7b-dpo": RetryProvider([HuggingChat], shuffle=False),
-            "mistral-7b": RetryProvider([HuggingChat], shuffle=False),
-            "yi-1.5-9b": RetryProvider([FreeChatgpt], shuffle=False),
-            "SparkDesk-v1.1": RetryProvider([FreeChatgpt], shuffle=False),
-        }
+        self.providers = {}
+        models = _initialize_providers()
+        for model in models:
+            self.providers[model] = RetryProvider(models[model])
+
         self.results = []
 
     async def test_provider_availability(self):
@@ -64,8 +41,7 @@ class AITests(unittest.IsolatedAsyncioTestCase):
         provider_name = provider.__name__
         print(f"[?] Отправляю запрос провайдеру {provider_name} используя модель {model}")
         try:
-            async_create = sync_to_async(Client().chat.completions.create)
-            response = await async_create(
+            response = await AsyncClient().chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": "Hello"}],
                 provider=provider
