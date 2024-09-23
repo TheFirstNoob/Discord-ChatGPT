@@ -101,17 +101,17 @@ class DiscordClient(discord.Client):
                 tasks = []
                 while not self.message_queue.empty():
                     async with self.current_channel.typing():
-                        message, user_message = await self.message_queue.get()
-                        tasks.append(self.send_message(message, user_message))
+                        message, user_message, request_type = await self.message_queue.get()
+                        tasks.append(self.send_message(message, user_message, request_type))
                         self.message_queue.task_done()
                 if tasks:
                     await asyncio.gather(*tasks)  # Параллельная обработка сообщений
             await asyncio.sleep(1)
 
-    async def enqueue_message(self, message, user_message, request_type=None):
+    async def enqueue_message(self, message, user_message, request_type):
         await self.message_queue.put((message, user_message, request_type))
 
-    async def send_message(self, message, user_message):
+    async def send_message(self, message, user_message, request_type):
         user_id = message.user.id
 
         try:

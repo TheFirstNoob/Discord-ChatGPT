@@ -50,7 +50,7 @@ async def run_discord_bot():
             message = combined_message
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] в ({discordClient.current_channel})")
-        await discordClient.enqueue_message(interaction, message)
+        await discordClient.enqueue_message(interaction, message, request_type)
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
     @app_commands.choices(model=[
