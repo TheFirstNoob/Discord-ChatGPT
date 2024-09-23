@@ -5,9 +5,7 @@ import discord
 import requests
 from src.log import logger
 from typing import Optional
-
 from g4f.client import Client, AsyncClient
-
 from src.aclient import discordClient
 from discord import app_commands
 
@@ -23,10 +21,20 @@ async def run_discord_bot():
         logger.info(f'{discordClient.user} успешно запущена!')
 
     @discordClient.tree.command(name="ask", description="Задать вопрос ChatGPT")
-    async def ask(interaction: discord.Interaction, *, message: str, additionalmessage: Optional[str] = None):
+    @app_commands.describe(message="Введите ваш запрос", request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)")
+    @app_commands.choices(request_type=[
+        app_commands.Choice(name="Поисковик", value="search"),
+        app_commands.Choice(name="Изображение", value="images"),
+        app_commands.Choice(name="Видео", value="videos")
+    ])
+    async def ask(interaction: discord.Interaction, *, message: str, additionalmessage: Optional[str] = None, request_type: Optional[str] = None):
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
+            return
+
+        if request_type:
+            await interaction.followup.send("> :x: **ОШИБКА:** К сожалению, функционал доступа в интернет для ИИ еще в разработке, пожалуйста используйте обычный запрос без добавления request_type")
             return
 
         username = str(interaction.user)
@@ -38,7 +46,7 @@ async def run_discord_bot():
 
         if additionalmessage:
             combined_message = f"{message} {additionalmessage}"
-            logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{combined_message}] в ({discordClient.current_channel})")
+            logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{combined_message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
             message = combined_message
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] в ({discordClient.current_channel})")

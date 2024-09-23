@@ -7,12 +7,14 @@ from dotenv import load_dotenv
 from src.log import logger, setup_logger
 from utils.message_utils import send_split_message
 from discord import app_commands
+from duckduckgo_search import AsyncDDGS
+from bs4 import BeautifulSoup
 import g4f.debug
 from g4f.client import AsyncClient
 from g4f.stubs import ChatCompletion
 from g4f.Provider import (
-    Airforce, Blackbox, Bixin123, Binjie, ChatGot, Chatgpt4o, ChatgptFree,
-    DDG, DeepInfraImage, FreeChatgpt, Free2GPT, HuggingChat, HuggingFace, Nexra,
+    Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree, ChatGptEs,
+    DDG, FreeChatgpt, Free2GPT, HuggingChat, Nexra,
     ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
     Pizzagpt, RetryProvider
 )
@@ -42,15 +44,14 @@ class RetryProvider:
     def reset(self):
         self.current_index = 0
 
-
 def _initialize_providers():
     return {
         # Chat providers
         "gpt-3.5-turbo": [FreeChatgpt, Nexra],
         "gpt-4": [Nexra, Binjie, Airforce, Liaobots],
         "gpt-4-turbo": [Nexra, Airforce, Liaobots],
-        "gpt-4o-mini": [Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots],
-        "gpt-4o": [LiteIcoding, Airforce, Liaobots],
+        "gpt-4o-mini": [Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG, Liaobots],
+        "gpt-4o": [LiteIcoding, ChatGptEs, Airforce, Liaobots],
         "claude-3-haiku": [ DDG, Liaobots],
         "blackbox": [Blackbox],
         "gemini-flash": [Blackbox, Liaobots],
@@ -70,7 +71,6 @@ def _initialize_providers():
         "SparkDesk-v1.1": [FreeChatgpt],
     }
 
-
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
         intents = discord.Intents.default()
@@ -81,7 +81,7 @@ class DiscordClient(discord.Client):
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
 
-        self.default_provider = RetryProvider([Pizzagpt, ChatgptFree, Airforce, DDG, Liaobots], shuffle=False)
+        self.default_provider = RetryProvider([Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG, Liaobots], shuffle=False)
         self.chatBot = AsyncClient(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
@@ -108,8 +108,8 @@ class DiscordClient(discord.Client):
                     await asyncio.gather(*tasks)  # Параллельная обработка сообщений
             await asyncio.sleep(1)
 
-    async def enqueue_message(self, message, user_message):
-        await self.message_queue.put((message, user_message))
+    async def enqueue_message(self, message, user_message, request_type=None):
+        await self.message_queue.put((message, user_message, request_type))
 
     async def send_message(self, message, user_message):
         user_id = message.user.id
@@ -156,7 +156,6 @@ class DiscordClient(discord.Client):
                 response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
                 break
             except Exception as e:
-                # Логируем ошибку и пробуем следующего провайдера
                 print(f"Error with provider {provider}: {e}")
                 continue
 
