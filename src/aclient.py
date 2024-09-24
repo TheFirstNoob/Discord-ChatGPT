@@ -168,14 +168,9 @@ class DiscordClient(discord.Client):
         return f"{model_response}\n\n{bot_response}"
         
     async def download_conversation_history(self, user_id: int) -> str:
-        if user_id is None:
-            filepath = os.path.join(USER_DATA_DIR, 'system.json')
-        else:
-            filepath = os.path.join(USER_DATA_DIR, f'{user_id}.json')
-        
-        if os.path.exists(filepath):
-            return filepath
-        return None
+        filename = SYSTEM_DATA_FILE if user_id is None else f'{user_id}.json'
+        filepath = os.path.join(USER_DATA_DIR, filename)
+        return filepath if os.path.exists(filepath) else None
 
     async def get_provider_for_model(self, model: str):
         providers_dict = _initialize_providers()
@@ -191,9 +186,8 @@ class DiscordClient(discord.Client):
         await self.save_user_data(user_id, user_data)
 
     async def get_user_data_filepath(self, user_id):
-        if user_id is None:
-            return os.path.join(USER_DATA_DIR, 'system.json')
-        return os.path.join(USER_DATA_DIR, f'{user_id}.json')
+        filename = 'system.json' if user_id is None else f'{user_id}.json'
+        return os.path.join(USER_DATA_DIR, filename)
 
     async def load_user_data(self, user_id):
         if user_id in user_data_cache:

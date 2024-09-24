@@ -2,7 +2,7 @@ import os
 import re
 import asyncio
 import discord
-import requests
+import aiohttp
 from src.log import logger
 from typing import Optional
 from g4f.client import Client, AsyncClient
@@ -21,7 +21,11 @@ async def run_discord_bot():
         logger.info(f'{discordClient.user} успешно запущена!')
 
     @discordClient.tree.command(name="ask", description="Задать вопрос ChatGPT")
-    @app_commands.describe(message="Введите ваш запрос", request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)")
+    @app_commands.describe(
+        message="Введите ваш запрос",
+        additionalmessage="Дополнительная информация к запросу (необязательно)",
+        request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)"
+    )
     @app_commands.choices(request_type=[
         app_commands.Choice(name="Поисковик", value="search"),
         app_commands.Choice(name="Изображение", value="images"),
@@ -89,15 +93,19 @@ async def run_discord_bot():
 
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
 
-        if model.value == "claude-3-haiku":
-            await interaction.followup.send("> :warning: **Провайдер этой модели не поддерживает историю общения и не имеет памяти. Это особенность провайдера, а не моя ОШИБКА!**")
-        elif model.value == "llama-3.1-405b":
-            await interaction.followup.send("> :warning: **Генерация ответов от этой модели может быть долгой. Данная модель требует больших ресурсов для генерации!**")
-        elif model.value == "pi":
-            await interaction.followup.send("> :warning: **Ответы от этой модели могут долго приходить, провайдеру нужно что-то типо проснуться для инициализации!**")
-        elif model.value == "llama-3.1-sonar-large-128k-online":
-            await interaction.followup.send("> :warning: **Эта модель имеет доступ в интернет для поиска, но не поддерживает контекст диалога и, вроде как, не имеет памяти!**")
-            await interaction.followup.send("> :warning: **Эта модель пока что работает нестабильно**")
+        model_warnings = {
+            "claude-3-haiku": "> :warning: **Провайдер этой модели не поддерживает историю общения и не имеет памяти. Это особенность провайдера!**",
+            "llama-3.1-405b": "> :warning: **Генерация ответов от этой модели может быть долгой, требуется много ресурсов!**",
+            "llama-3.1-sonar-large-128k-online": [
+                "> :warning: **Эта модель имеет доступ в интернет, но не поддерживает контекст диалога!**",
+                "> :warning: **Эта модель может работать нестабильно!**"
+            ]
+        }
+
+        warning_messages = model_warnings.get(model.value)
+        if warning_messages:
+            for message in warning_messages:
+                await interaction.followup.send(message)
 
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
 
@@ -106,7 +114,6 @@ async def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         await discordClient.reset_conversation_history(user_id)
-        await discordClient.send_start_prompt()
         await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Ваша история и модели ИИ сброшены!")
         logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю.\x1b[0m")
 
@@ -211,8 +218,11 @@ async def run_discord_bot():
             await interaction.followup.send("> :x: **ОШИБКА:** История сообщений не найдена!")
     
     @discordClient.tree.command(name="draw", description="Сгенерировать изображение от модели ИИ")
-    @app_commands.describe(prompt="Описание изображения", service="Выберите сервис")
-    @app_commands.choices(service=[
+    @app_commands.describe(
+        prompt="Введите ваш запрос (На Английском языке)",
+        image_model="Выберите модель для генерации изображения"
+    )
+    @app_commands.choices(image_model=[
         app_commands.Choice(name="Stable Diffusion XL", value="sdxl"),
         app_commands.Choice(name="Stable Diffusion v3", value="sd-3"),
         app_commands.Choice(name="Playground v2.5", value="playground-v2.5"),
@@ -228,36 +238,37 @@ async def run_discord_bot():
         app_commands.Choice(name="Any Dark", value="any-dark"),
     ])
     
-    async def draw(interaction: discord.Interaction, prompt: str, service: app_commands.Choice[str]):
+    async def draw(interaction: discord.Interaction, prompt: str, image_model: app_commands.Choice[str]):
         if interaction.user == discordClient.user:
             return
 
         username = str(interaction.user)
         channel = str(interaction.channel)
-        logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{service.value}]")
+        logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{image_model.value}]")
 
         try:
             await interaction.response.defer()
 
-            response = await asyncio.to_thread(client.images.generate, model=service.value, prompt=prompt)
+            response = await asyncio.to_thread(client.images.generate, model=image_model.value, prompt=prompt)
 
             if response.data:
                 image_url = response.data[0].url
-                
-                # Сохранение изображения (Discord долго порой конвертирует ссылки на изображение поэтому быстрее сохранить и отправить)
-                image_response = requests.get(image_url)
-                if image_response.status_code == 200:
-                    image_path = f"temp_image_{interaction.user.id}.png"
-                    with open(image_path, 'wb') as f:
-                        f.write(image_response.content)
 
-                    with open(image_path, 'rb') as f:
-                        model_message = f":paintbrush: **Изображение от модели**: {service.name}"
-                        await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
+                async with aiohttp.ClientSession() as session: # Используем aiohttp
+                    async with session.get(image_url) as image_response:
+                        if image_response.status == 200:
+                            image_data = await image_response.read()
+                            image_path = f"temp_image_{interaction.user.id}.png"
+                            with open(image_path, 'wb') as f:
+                                f.write(image_data)
 
-                    os.remove(image_path)
-                else:
-                    await interaction.followup.send("> :x: **ОШИБКА:** Не удалось загрузить изображение.")
+                            with open(image_path, 'rb') as f:
+                                model_message = f":paintbrush: **Изображение от модели**: {image_model.name}"
+                                await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
+
+                            os.remove(image_path)
+                        else:
+                            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось загрузить изображение. Код ошибки: {image_response.status}")
             else:
                 await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение.")
         except Exception as e:
