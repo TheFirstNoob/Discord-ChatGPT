@@ -22,6 +22,8 @@ class AITests(unittest.IsolatedAsyncioTestCase):
             self.providers[model] = RetryProvider(models[model])
 
         self.results = []
+        self.success = 0
+        self.total = 0
 
     async def test_provider_availability(self):
         sys.tracebacklimit = 0
@@ -33,11 +35,17 @@ class AITests(unittest.IsolatedAsyncioTestCase):
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
+        print("-"*15)
+        print(f"{self.INFO} {self.success} из {self.total} провайдеров ответили на тестовый запрос без ошибок!")
+        print("-"*15)
+
         # Save results to a JSON file
         with open('results.json', 'w', encoding='utf-8') as f:
             json.dump(self.results, f, ensure_ascii=False, indent=4)
 
     async def check_provider(self, model, provider):
+        self.total += 1
+
         provider_name = provider.__name__
         print(f"[?] Отправляю запрос провайдеру {provider_name} используя модель {model}")
         try:
@@ -52,6 +60,7 @@ class AITests(unittest.IsolatedAsyncioTestCase):
             var = res[0]
 
             print(f"{self.INFO}[+] Ответ от модели {model} провайдера {provider_name}: {res}")
+            self.success += 1
             self.results.append({
                 "model": model,
                 "provider": provider_name,
