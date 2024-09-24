@@ -24,6 +24,7 @@ load_dotenv()
 g4f.debug.logging = True
 user_data_cache = {}
 
+SYSTEM_DATA_FILE = "system.json"
 USER_DATA_DIR = 'user_data'
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
