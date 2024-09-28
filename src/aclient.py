@@ -24,6 +24,7 @@ load_dotenv()
 g4f.debug.logging = True
 user_data_cache = {}
 
+SYSTEM_DATA_FILE = "system.json"
 USER_DATA_DIR = 'user_data'
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
@@ -52,11 +53,10 @@ def _initialize_providers():
         "gpt-4-turbo": [Nexra, Airforce, Liaobots],
         "gpt-4o-mini": [Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG, Liaobots],
         "gpt-4o": [LiteIcoding, ChatGptEs, Airforce, Liaobots],
-        "claude-3-haiku": [ DDG, Liaobots],
+        "claude-3-haiku": [DDG, Liaobots],
         "blackbox": [Blackbox],
         "gemini-flash": [Blackbox, Liaobots],
         "gemini-pro": [ChatGot, Liaobots],
-        "gemma-2b": [ReplicateHome],
         "command-r-plus": [HuggingChat],
         "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, DDG],
         "llama-3.1-405b": [Blackbox],
