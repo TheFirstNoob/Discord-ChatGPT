@@ -7,7 +7,7 @@ from src.log import logger
 from typing import Optional
 from g4f.client import Client, AsyncClient
 from src.aclient import discordClient
-from discord import app_commands
+from discord import app_commands, Attachment
 
 client = Client()
 
@@ -23,7 +23,6 @@ async def run_discord_bot():
     @discordClient.tree.command(name="ask", description="Задать вопрос ChatGPT")
     @app_commands.describe(
         message="Введите ваш запрос",
-        additionalmessage="Дополнительная информация к запросу (необязательно)",
         request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)"
     )
     @app_commands.choices(request_type=[
@@ -31,14 +30,10 @@ async def run_discord_bot():
         app_commands.Choice(name="Изображение", value="images"),
         app_commands.Choice(name="Видео", value="videos")
     ])
-    async def ask(interaction: discord.Interaction, *, message: str, additionalmessage: Optional[str] = None, request_type: Optional[str] = None):
+    async def ask(interaction: discord.Interaction, *, message: str, request_type: Optional[str] = None):
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
-            return
-
-        if request_type:
-            await interaction.followup.send("> :x: **ОШИБКА:** К сожалению, функционал доступа в интернет для ИИ еще в разработке, пожалуйста используйте обычный запрос без добавления request_type")
             return
 
         username = str(interaction.user)
@@ -47,14 +42,43 @@ async def run_discord_bot():
         user_id = interaction.user.id
         user_data = await discordClient.load_user_data(user_id)
         user_model = user_data.get('model', discordClient.default_model)
+        print(user_model)
 
-        if additionalmessage:
-            combined_message = f"{message} {additionalmessage}"
-            logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{combined_message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
-            message = combined_message
+        logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
+        response = await discordClient.handle_response(user_id, message, request_type)
+        await interaction.followup.send(response)
+        
+    @discordClient.tree.command(name="asklong", description="Задать длинный вопрос ChatGPT через текст и файл")
+    @app_commands.describe(
+        message="Введите ваш запрос",
+        file="Загрузите текстовый файл с вашим запросом/кодом и т.п.",
+        request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)"
+    )
+    @app_commands.choices(request_type=[
+        app_commands.Choice(name="Поисковик", value="search"),
+        app_commands.Choice(name="Изображение", value="images"),
+        app_commands.Choice(name="Видео", value="videos")
+    ])
+    async def asklong(interaction: discord.Interaction, message: str, file: Attachment, request_type: Optional[str] = None):
+        await interaction.response.defer(ephemeral=False)
 
-        logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] в ({discordClient.current_channel})")
-        await discordClient.enqueue_message(interaction, message, request_type)
+        if interaction.user == discordClient.user:
+            return
+
+        username = str(interaction.user)
+        discordClient.current_channel = interaction.channel
+
+        try:
+            file_content = await file.read()
+            file_message = file_content.decode('utf-8')
+            message = f"{message}\n\n{file_message}"
+        except Exception as e:
+            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось прочитать файл. {str(e)}")
+            return
+
+        logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
+        response = await discordClient.handle_response(interaction.user.id, message, request_type)
+        await interaction.followup.send(response)
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
     @app_commands.choices(model=[
@@ -97,7 +121,7 @@ async def run_discord_bot():
             "claude-3-haiku": "> :warning: **Провайдер этой модели не поддерживает историю общения и не имеет памяти. Это особенность провайдера!**",
             "llama-3.1-405b": "> :warning: **Генерация ответов от этой модели может быть долгой, требуется много ресурсов!**",
             "llama-3.1-sonar-large-128k-online": [
-                "> :warning: **Эта модель имеет доступ в интернет, но не поддерживает контекст диалога!**",
+                "> :warning: **Эта модель имеет свой доступ в интернет, в отличии от request_type, но не поддерживает контекст диалога!**",
                 "> :warning: **Эта модель может работать нестабильно!**"
             ]
         }
@@ -171,6 +195,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="3.3.0", value="3.3.0"),
         app_commands.Choice(name="3.2.0", value="3.2.0"),
         app_commands.Choice(name="3.1.1", value="3.1.1"),
         app_commands.Choice(name="3.1.0", value="3.1.0"),
@@ -202,7 +227,7 @@ async def run_discord_bot():
         
     @discordClient.tree.command(name="history", description="Получить историю сообщений")
     async def history(interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
             return
@@ -249,12 +274,13 @@ async def run_discord_bot():
         try:
             await interaction.response.defer()
 
+            # Ждем g4f обновления чтобы заменить на AsyncClient
             response = await asyncio.to_thread(client.images.generate, model=image_model.value, prompt=prompt)
 
             if response.data:
                 image_url = response.data[0].url
 
-                async with aiohttp.ClientSession() as session: # Используем aiohttp
+                async with aiohttp.ClientSession() as session:
                     async with session.get(image_url) as image_response:
                         if image_response.status == 200:
                             image_data = await image_response.read()

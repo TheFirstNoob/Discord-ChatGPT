@@ -3,8 +3,9 @@ import json
 import discord
 import asyncio
 import aiofiles
+import aiohttp
 from dotenv import load_dotenv
-from src.log import logger, setup_logger
+from src.log import logger
 from utils.message_utils import send_split_message
 from discord import app_commands
 from duckduckgo_search import AsyncDDGS
@@ -24,7 +25,7 @@ load_dotenv()
 g4f.debug.logging = True
 user_data_cache = {}
 
-SYSTEM_DATA_FILE = "system.json"
+SYSTEM_DATA_FILE = 'system.json'
 USER_DATA_DIR = 'user_data'
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
@@ -107,6 +108,50 @@ class DiscordClient(discord.Client):
                 if tasks:
                     await asyncio.gather(*tasks)  # Параллельная обработка сообщений
             await asyncio.sleep(1)
+            
+    async def process_request(self, query, request_type="search", max_results=3):
+        if request_type == 'search':
+            print(f"Поиск по запросу: {query}")
+            results = await AsyncDDGS().atext(query, max_results=max_results)
+            conversation_history = []
+            for result in results:
+                url = result.get('href')
+                if url:
+                    title, paragraphs = await self.get_website_info(url)
+                    if title and paragraphs:
+                        conversation_history.append(f"Ссылка на ресурс: {url}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
+            return conversation_history
+        elif request_type == 'images':
+            print(f"Картинки по запросу: {query}")
+            results = await AsyncDDGS().aimages(query, max_results=5)
+            image_links = [result['image'] for result in results]
+            return [
+                f"Картинки по запросу '{query}' полученному от пользователя:" +
+                "\n".join(image_links)
+            ]
+        elif request_type == 'videos':
+            print(f"Поиск видео по запросу: {query}")
+            results = await AsyncDDGS().avideos(query, max_results=5)
+            media_links = [result['content'] for result in results]
+            return [
+                f"Видео по запросу '{query}' полученному от пользователя:" +
+                "\n".join(media_links)
+            ]
+
+    async def get_website_info(self, url):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        raise Exception(f"HTTP статус: {response.status}")
+                    html = await response.text()
+                    soup = BeautifulSoup(html, 'html.parser')
+                    title = soup.title.text
+                    paragraphs = [p.text for p in soup.find_all('p')]
+                    return title, '\n'.join(paragraphs)
+        except Exception as e:
+            print(f"Ошибка при получении информации с сайта: {e}")
+            return None, "Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите (Ваше имя) если ошибка повторяется несколько раз"
 
     async def enqueue_message(self, message, user_message, request_type):
         await self.message_queue.put((message, user_message, request_type))
@@ -137,7 +182,7 @@ class DiscordClient(discord.Client):
         except Exception as e:
             logger.exception(f"Ошибка при отправке промта: {e}")
 
-    async def handle_response(self, user_id: int, user_message: str) -> str:
+    async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
         user_data = await self.load_user_data(user_id)
         conversation_history = user_data.get('history', [])
         user_model = user_data.get('model', self.default_model)
@@ -146,6 +191,11 @@ class DiscordClient(discord.Client):
 
         if len(conversation_history) > self.max_history_length:
             conversation_history = conversation_history[3:]  # Удаляем по 3 первых сообщения при переполении памяти
+
+        if request_type:
+            search_results = await self.process_request(user_message, request_type=request_type, max_results=3)
+            for result in search_results:
+                conversation_history.append({'role': 'assistant', 'content': f"[СИСТЕМНОЕ СООБЩЕНИЕ! ИНФОРМАЦИЯ ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ ПОЛУЧЕННАЯ ИЗ ИНТЕРНЕТА]: {result}"})
 
         retry_provider = await self.get_provider_for_model(user_model)
         retry_provider.reset()
@@ -186,7 +236,7 @@ class DiscordClient(discord.Client):
         await self.save_user_data(user_id, user_data)
 
     async def get_user_data_filepath(self, user_id):
-        filename = 'system.json' if user_id is None else f'{user_id}.json'
+        filename = SYSTEM_DATA_FILE if user_id is None else f'{user_id}.json'
         return os.path.join(USER_DATA_DIR, filename)
 
     async def load_user_data(self, user_id):
