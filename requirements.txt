@@ -4,5 +4,5 @@ asgiref==3.8.1
 selenium==4.24.0
 aiofiles==24.1.0
 aiohttp==3.10.5
-g4f==0.3.2.8
+g4f==0.3.2.9
 g4f[all]
