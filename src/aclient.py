@@ -14,10 +14,31 @@ import g4f.debug
 from g4f.client import AsyncClient
 from g4f.stubs import ChatCompletion
 from g4f.Provider import (
-    Airforce, Blackbox, Bixin123, Binjie, ChatGot, ChatgptFree, ChatGptEs,
-    DDG, FreeChatgpt, Free2GPT, HuggingChat, Nexra,
-    ReplicateHome, Liaobots, LiteIcoding, PerplexityLabs, TeachAnything,
-    Pizzagpt, RetryProvider
+    Allyfy,
+    Airforce,
+    AIChatFree,
+    Blackbox,
+    Binjie,
+    ChatGot,
+    ChatgptFree,
+    ChatGptEs,
+    DeepInfraChat,
+    DDG,
+    FreeChatgpt,
+    Free2GPT,
+    GPROChat,
+    HuggingChat,
+    MagickPen,
+    Nexra,
+    ReplicateHome,
+    Liaobots,
+    LiteIcoding,
+    PerplexityLabs,
+    TeachAnything,
+    Pizzagpt,
+    Upstage,
+    
+    RetryProvider
 )
 
 load_dotenv()
@@ -49,27 +70,30 @@ class RetryProvider:
 def _initialize_providers():
     return {
         # Chat providers
-        "gpt-3.5-turbo": [FreeChatgpt, Nexra],
-        "gpt-4": [Nexra, Binjie, Airforce, Liaobots],
+        "gpt-3.5-turbo": [FreeChatgpt, Nexra, Allyfy],
+        "gpt-4": [Nexra, Binjie, Airforce],
         "gpt-4-turbo": [Nexra, Airforce, Liaobots],
-        "gpt-4o-mini": [Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG, Liaobots],
-        "gpt-4o": [LiteIcoding, ChatGptEs, Airforce, Liaobots],
-        "claude-3-haiku": [DDG, Liaobots],
+        "gpt-4o-mini": [Pizzagpt, ChatgptFree, ChatGptEs, Airforce, MagickPen, DDG, Liaobots],
+        "gpt-4o": [Blackbox, LiteIcoding, ChatGptEs, Airforce, Nexra, Liaobots],
+        "claude-3-haiku": [DDG, Airforce, Liaobots],
+        "claude-3.5-sonnet": [Blackbox, Airforce, Liaobots],
         "blackbox": [Blackbox],
-        "gemini-flash": [Blackbox, Liaobots],
-        "gemini-pro": [ChatGot, Liaobots],
+        "gemini-flash": [Blackbox, Airforce, Liaobots],
+        "gemini-pro": [Blackbox, ChatGot, Airforce, GPROChat, AIChatFree, Nexra, Liaobots],
+        "gemma-2b-27b": [Airforce, DeepInfraChat],
         "command-r-plus": [HuggingChat],
-        "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, DDG],
-        "llama-3.1-405b": [Blackbox],
-        "llama-3.1-sonar-large-128k-online": [PerplexityLabs],
-        "llama-3.1-sonar-large-128k-chat": [PerplexityLabs],
-        "qwen-turbo": [Bixin123],
-        "qwen-2-72b": [Airforce],
+        "llama-3.1-70b": [HuggingChat, Blackbox, DeepInfraChat, TeachAnything, Free2GPT, Airforce, DDG],
+        "llama-3.1-405b": [Blackbox, Airforce],
+        "llama-3.2-11b": [HuggingChat],
+        "llama-3.2-90b": [Airforce],
+        "sonar-online": [PerplexityLabs],
+        "sonar-chat": [PerplexityLabs],
+        "solar-pro": [Upstage],
+        "qwen-2-72b": [Airforce, HuggingChat],
         "mixtral-8x7b": [HuggingChat, ReplicateHome, DDG],
-        "mixtral-8x7b-dpo": [HuggingChat],
-        "mistral-7b": [HuggingChat],
-        "yi-1.5-9b": [FreeChatgpt],
+        "yi-34b": [Airforce],
         "SparkDesk-v1.1": [FreeChatgpt],
+        "phi-3.5-mini": [HuggingChat],
     }
 
 class DiscordClient(discord.Client):
@@ -78,6 +102,7 @@ class DiscordClient(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        self.providers_dict = _initialize_providers()
         self.default_model = os.getenv("MODEL")
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
@@ -106,7 +131,7 @@ class DiscordClient(discord.Client):
                         tasks.append(self.send_message(message, user_message, request_type))
                         self.message_queue.task_done()
                 if tasks:
-                    await asyncio.gather(*tasks)  # Параллельная обработка сообщений
+                    await asyncio.gather(*tasks)
             await asyncio.sleep(1)
             
     async def process_request(self, query, request_type="search", max_results=3):
@@ -150,7 +175,7 @@ class DiscordClient(discord.Client):
                     paragraphs = [p.text for p in soup.find_all('p')]
                     return title, '\n'.join(paragraphs)
         except Exception as e:
-            print(f"Ошибка при получении информации с сайта: {e}")
+            logger.exception(f"get_website_info: Ошибка при получении информации с сайта: {e}")
             return None, "Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите (Ваше имя) если ошибка повторяется несколько раз"
 
     async def enqueue_message(self, message, user_message, request_type):
@@ -160,11 +185,11 @@ class DiscordClient(discord.Client):
         user_id = message.user.id
 
         try:
-            response = await self.handle_response(user_id, user_message)
+            response = await self.handle_response(user_id, user_message, request_type)
             response_content = f'\n{response}'
             await send_split_message(self, response_content, message)
         except Exception as e:
-            logger.exception(f"Ошибка при отправке: {e}")
+            logger.exception(f"send_message: Ошибка при отправке: {e}")
 
     async def send_start_prompt(self):
         discord_channel_id = os.getenv("DISCORD_CHANNEL_ID")
@@ -180,7 +205,7 @@ class DiscordClient(discord.Client):
             else:
                 logger.info("Не установлены системные инструкции или не выбран Discord канал. Пропуск отправки `send_start_prompt` функции.")
         except Exception as e:
-            logger.exception(f"Ошибка при отправке промта: {e}")
+            logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
 
     async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
         user_data = await self.load_user_data(user_id)
@@ -190,12 +215,12 @@ class DiscordClient(discord.Client):
         conversation_history.append({'role': 'user', 'content': user_message})
 
         if len(conversation_history) > self.max_history_length:
-            conversation_history = conversation_history[3:]  # Удаляем по 3 первых сообщения при переполении памяти
+            conversation_history = conversation_history[3:]
 
         if request_type:
             search_results = await self.process_request(user_message, request_type=request_type, max_results=3)
             for result in search_results:
-                conversation_history.append({'role': 'assistant', 'content': f"[СИСТЕМНОЕ СООБЩЕНИЕ! ИНФОРМАЦИЯ ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ ПОЛУЧЕННАЯ ИЗ ИНТЕРНЕТА]: {result}"})
+                conversation_history.append({'role': 'assistant', 'content': f"[!!!СИСТЕМНАЯ ИНСТРУКЦИЯ!!! ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ ПОЛЬЗОВАТЕЛЮ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, И ОБЯЗАТЕЛЬНО УКАЖИ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА, ТО СООБЩИ ПОЛЬЗОВАТЕЛЮ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ. ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ КАРТИНКИ ИЛИ ВИДЕО, ТО ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА!]: Результат поиска: {result}"})
 
         retry_provider = await self.get_provider_for_model(user_model)
         retry_provider.reset()
@@ -206,15 +231,14 @@ class DiscordClient(discord.Client):
                 response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
                 break
             except Exception as e:
-                print(f"Error with provider {provider}: {e}")
+                logger.exception(f"handle_response: Ошибка с провайдером {provider}: {e}")
                 continue
 
-        model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия Hitagi ChatGPT:** *{os.environ.get('VERSION_BOT')}*"
+        model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия (Ваш бот):** *{os.environ.get('VERSION_BOT')}*"
         bot_response = response.choices[0].message.content
         conversation_history.append({'role': 'assistant', 'content': bot_response})
 
         await self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
-
         return f"{model_response}\n\n{bot_response}"
         
     async def download_conversation_history(self, user_id: int) -> str:
@@ -223,8 +247,7 @@ class DiscordClient(discord.Client):
         return filepath if os.path.exists(filepath) else None
 
     async def get_provider_for_model(self, model: str):
-        providers_dict = _initialize_providers()
-        providers = providers_dict.get(model, self.default_provider)
+        providers = self.providers_dict.get(model, self.default_provider)
         return RetryProvider(providers, shuffle=False)
 
     async def reset_conversation_history(self, user_id: int):

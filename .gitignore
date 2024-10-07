@@ -8,4 +8,3 @@ utils/__init__.py
 
 .idea
 __pycache__
-results.json

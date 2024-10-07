@@ -1,0 +1,325 @@
+"_comment": "Tested time: 07.10.24 15:04 UTC+3. Region: RU"
+
+
+[
+    {
+        "model": "gpt-3.5-turbo",
+        "provider": "FreeChatgpt",
+        "response": "Hello! How can I assist you today? If you have any questions, need information, or want to discuss a topic, feel free to ask.Hello! How can I assist you today? If you have any questions, need information, or want to discuss a topic, feel free to ask."
+    },
+    {
+        "model": "gpt-3.5-turbo",
+        "provider": "Nexra",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-3.5-turbo",
+        "provider": "Allyfy",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4",
+        "provider": "Nexra",
+        "response": "Hello! How can I help you today?"
+    },
+    {
+        "model": "gpt-4",
+        "provider": "Binjie",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4-turbo",
+        "provider": "Nexra",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4-turbo",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4-turbo",
+        "provider": "Liaobots",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "Pizzagpt",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "ChatgptFree",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "ChatGptEs",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "MagickPen",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "DDG",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "Liaobots",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "Blackbox",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "LiteIcoding",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "ChatGptEs",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "Nexra",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "Liaobots",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "claude-3-haiku",
+        "provider": "DDG",
+        "response": "Hello! I'm happy to assist you. How can I help you today?"
+    },
+    {
+        "model": "claude-3-haiku",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "claude-3-haiku",
+        "provider": "Liaobots",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "claude-3.5-sonnet",
+        "provider": "Blackbox",
+        "response": "Hello! It's nice to meet you. I'm your AI assistant, here to help with a wide range of tasks. Whether you need help with analysis, question answering, math, coding, creative writing, teaching, role-play, or just want to have a general discussion, I'm here to assist you.\n\nWhat brings you here today? Do you have a specific question or topic you'd like to explore? I'm all ears!"
+    },
+    {
+        "model": "claude-3.5-sonnet",
+        "provider": "Airforce",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?"
+    },
+    {
+        "model": "claude-3.5-sonnet",
+        "provider": "Liaobots",
+        "response": "Hello! How can I assist you today? Feel free to ask me any questions or let me know if you need help with anything."
+    },
+    {
+        "model": "blackbox",
+        "provider": "Blackbox",
+        "response": "Hello. It's nice to meet you. Is there something I can help you with or would you like to chat?"
+    },
+    {
+        "model": "gemini-flash",
+        "provider": "Blackbox",
+        "response": "Hello! 👋  How can I help you today? 😊 \n"
+    },
+    {
+        "model": "gemini-flash",
+        "provider": "Airforce",
+        "response": "Hello! 👋  How can I help you today? 😊 \n"
+    },
+    {
+        "model": "gemini-flash",
+        "provider": "Liaobots",
+        "response": "Hello there! How can I help you today?\n"
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "Blackbox",
+        "response": "Hello! 👋 \n\nIt's nice to hear from you. What can I do for you today? 😊 \n"
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "ChatGot",
+        "response": "Hi there! How can I help you today?"
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "Airforce",
+        "response": "Hello! 👋  How can I help you today? 😊 \n"
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "GPROChat",
+        "response": "Hello there! How can I help you today?"
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "AIChatFree",
+        "response": "Hello there! How can I assist you today?"
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "Nexra",
+        "response": "Hi there! How can I help you today?\""
+    },
+    {
+        "model": "gemini-pro",
+        "provider": "Liaobots",
+        "response": "How can I help you today?\n"
+    },
+    {
+        "model": "gemma-2b-27b",
+        "provider": "Airforce",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?"
+    },
+    {
+        "model": "gemma-2b-27b",
+        "provider": "DeepInfraChat",
+        "response": "Hello! 👋  How can I be helpful today? 😊"
+    },
+    {
+        "model": "command-r-plus",
+        "provider": "HuggingChat",
+        "response": "Hello! How can I help you today?"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "HuggingChat",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "Blackbox",
+        "response": "**Welcome!**\n\nI'm happy to help you with any questions or tasks you may have. How can I assist you today?\n\nPlease feel free to ask me anything, and I'll do my best to provide a helpful response.\n\n**What's on your mind?**\n\n* Do you have a specific question or topic you'd like to discuss?\n* Are you looking for help with a particular task or project?\n* Or perhaps you just want to chat and see how I can assist you?"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "DeepInfraChat",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "TeachAnything",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "Free2GPT",
+        "response": "Hello there! How can I help you today?\n"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "Airforce",
+        "response": "Hello. How can I help you today?"
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "DDG",
+        "response": "Hello. How can I assist you today?"
+    },
+    {
+        "model": "llama-3.1-405b",
+        "provider": "Blackbox",
+        "response": "Hello. Is there something I can help you with or would you like to chat?"
+    },
+    {
+        "model": "llama-3.1-405b",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "llama-3.2-11b",
+        "provider": "HuggingChat",
+        "response": "Hello! How are you today? <|im_end|"
+    },
+    {
+        "model": "llama-3.2-90b",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today?"
+    },
+    {
+        "model": "sonar-online",
+        "provider": "PerplexityLabs",
+        "error": "Unknown error"
+    },
+    {
+        "model": "sonar-chat",
+        "provider": "PerplexityLabs",
+        "response": "Hello How can I assist you today?"
+    },
+    {
+        "model": "solar-pro",
+        "provider": "Upstage",
+        "response": "Hello! Nice to meet you, I'm Solar, your AI assistant. How can I assist you today?"
+    },
+    {
+        "model": "qwen-2-72b",
+        "provider": "Airforce",
+        "response": "Hello! How can I assist you today? Let me know if you have any questions or need help with anything. I'm here to provide information, solve problems, or just chat if you'd like. Just let me know how I can be of service! Is there something specific you'd like to talk about or ask about? I'm here to help with anything you need. So, what can I do for you today? I'm looking forward to our conversation! If you have any questions or concerns, please don't hesitate to ask. I'm here to assist in any way that I can! Just let me know what's on your mind and we'll go from there! Have a great day! Is there anything else that you would like assistance with today? Let me know and we'll get started! Thank you for reaching out! If there's anything else that comes up in the future, please don't hesitate to reach out again! Have a great day! Goodbye! It was nice chatting with you! Don't forget that I'm always here if"
+    },
+    {
+        "model": "qwen-2-72b",
+        "provider": "HuggingChat",
+        "response": "Hello! It's nice to meet you. How can I assist you today? Whether you have questions, need information, or just want to chat, I'm here to help!"
+    },
+    {
+        "model": "mixtral-8x7b",
+        "provider": "HuggingChat",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?"
+    },
+    {
+        "model": "mixtral-8x7b",
+        "provider": "ReplicateHome",
+        "response": "Hello! I'm glad to be here to help you in any way I can. I strive to be respectful, honest, and helpful in all of my interactions. Is there something specific you would like assistance with? I'm here to answer any questions you have to the best of my ability."
+    },
+    {
+        "model": "mixtral-8x7b",
+        "provider": "DDG",
+        "response": " Hello! How can I assist you today? I'm here to provide answers to your questions and help with any programming or general knowledge topics you're interested in. Please note that all communications are completely anonymous and none of your data is stored or used for any purpose other than answering your immediate question. Let me know how I can help!"
+    },
+    {
+        "model": "yi-34b",
+        "provider": "Airforce",
+        "response": "Hi! How can I help you today?"
+    },
+    {
+        "model": "SparkDesk-v1.1",
+        "provider": "FreeChatgpt",
+        "response": "Hello! How can I assist you today?Hello! How can I assist you today?"
+    },
+    {
+        "model": "phi-3.5-mini",
+        "provider": "HuggingChat",
+        "response": "Hello! I'm Phi, an AI developed by Microsoft. How can I help you today?"
+    }
+]

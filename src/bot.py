@@ -5,11 +5,11 @@ import discord
 import aiohttp
 from src.log import logger
 from typing import Optional
-from g4f.client import Client, AsyncClient
+from g4f.client import AsyncClient
 from src.aclient import discordClient
 from discord import app_commands, Attachment
 
-client = Client()
+client = AsyncClient()
 
 async def run_discord_bot():
     @discordClient.event
@@ -42,11 +42,9 @@ async def run_discord_bot():
         user_id = interaction.user.id
         user_data = await discordClient.load_user_data(user_id)
         user_model = user_data.get('model', discordClient.default_model)
-        print(user_model)
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
-        response = await discordClient.handle_response(user_id, message, request_type)
-        await interaction.followup.send(response)
+        await discordClient.enqueue_message(interaction, message, request_type)
         
     @discordClient.tree.command(name="asklong", description="Задать длинный вопрос ChatGPT через текст и файл")
     @app_commands.describe(
@@ -77,8 +75,7 @@ async def run_discord_bot():
             return
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
-        response = await discordClient.handle_response(interaction.user.id, message, request_type)
-        await interaction.followup.send(response)
+        await discordClient.enqueue_message(interaction, message, request_type)
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
     @app_commands.choices(model=[
@@ -88,23 +85,24 @@ async def run_discord_bot():
         app_commands.Choice(name="GPT 4o-Mini", value="gpt-4o-mini"),
         app_commands.Choice(name="GPT 4o", value="gpt-4o"),
         app_commands.Choice(name="Claude 3 Haiku", value="claude-3-haiku"),
+        app_commands.Choice(name="Claude 3.5 Sonnet", value="claude-3.5-sonnet"),
         app_commands.Choice(name="Blackbox", value="blackbox"),
         app_commands.Choice(name="Gemini Flash", value="gemini-flash"),
         app_commands.Choice(name="Gemini Pro", value="gemini-pro"),
-        app_commands.Choice(name="Gemma Google 2B", value="gemma-2b"),
+        app_commands.Choice(name="Gemma Google v2 27B", value="gemma-2b-27b"),
         app_commands.Choice(name="Command R+", value="command-r-plus"),
+        app_commands.Choice(name="LLaMa v3.2 11B Vision", value="llama-3.2-11b"),
+        app_commands.Choice(name="LLaMa v3.2 90B Vision", value="llama-3.2-90b"),
         app_commands.Choice(name="LLaMa v3.1 70B", value="llama-3.1-70b"),
         app_commands.Choice(name="LLaMa v3.1 405B", value="llama-3.1-405b"),
-        app_commands.Choice(name="LLaMa v3.1 Sonar 128k (Online)", value="llama-3.1-sonar-large-128k-online"),
-        app_commands.Choice(name="LLaMa v3.1 Sonar 128k Chat", value="llama-3.1-sonar-large-128k-chat"),
-        app_commands.Choice(name="Pi", value="pi"),
-        app_commands.Choice(name="Qwen Turbo", value="qwen-turbo"),
+        app_commands.Choice(name="LLaMa v3.1 Sonar 128k (Online)", value="sonar-online"),
+        app_commands.Choice(name="LLaMa v3.1 Sonar 128k Chat", value="sonar-chat"),
+        app_commands.Choice(name="Solar Pro", value="solar-pro"),
         app_commands.Choice(name="Qwen v2 72B", value="qwen-2-72b"),
         app_commands.Choice(name="Mixtral-8x7B", value="mixtral-8x7b"),
-        app_commands.Choice(name="Mixtral-7B", value="mistral-7b"),
-        app_commands.Choice(name="Mixtral-7B Nous", value="mistral-7b-dpo"),
-        app_commands.Choice(name="Yi v1.5 9B", value="yi-1.5-9b"),
+        app_commands.Choice(name="Yi Hermes 34B", value="yi-34b"),
         app_commands.Choice(name="SparkDesk v1.1", value="SparkDesk-v1.1"),
+        app_commands.Choice(name="Phi v3.5 Mini Microsoft", value="phi-3.5-mini"),
     ])
     async def chat_model(interaction: discord.Interaction, model: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
@@ -118,9 +116,7 @@ async def run_discord_bot():
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
 
         model_warnings = {
-            "claude-3-haiku": "> :warning: **Провайдер этой модели не поддерживает историю общения и не имеет памяти. Это особенность провайдера!**",
-            "llama-3.1-405b": "> :warning: **Генерация ответов от этой модели может быть долгой, требуется много ресурсов!**",
-            "llama-3.1-sonar-large-128k-online": [
+            "sonar-online": [
                 "> :warning: **Эта модель имеет свой доступ в интернет, в отличии от request_type, но не поддерживает контекст диалога!**",
                 "> :warning: **Эта модель может работать нестабильно!**"
             ]
@@ -195,6 +191,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="3.3.1", value="3.3.1"),
         app_commands.Choice(name="3.3.0", value="3.3.0"),
         app_commands.Choice(name="3.2.0", value="3.2.0"),
         app_commands.Choice(name="3.1.1", value="3.1.1"),
@@ -252,12 +249,14 @@ async def run_discord_bot():
         app_commands.Choice(name="Stable Diffusion v3", value="sd-3"),
         app_commands.Choice(name="Playground v2.5", value="playground-v2.5"),
         app_commands.Choice(name="FLUX", value="flux"),
+        app_commands.Choice(name="FLUX 4o", value="flux-4o"),
         app_commands.Choice(name="FLUX Schnell", value="flux-schnell"),
         app_commands.Choice(name="FLUX Realism", value="flux-realism"),
         app_commands.Choice(name="FLUX Anime", value="flux-anime"),
         app_commands.Choice(name="FLUX 3D", value="flux-3d"),
         app_commands.Choice(name="FLUX Disney", value="flux-disney"),
         app_commands.Choice(name="FLUX Pixel", value="flux-pixel"),
+        app_commands.Choice(name="DALL-E v3", value="dalle-3"),
         app_commands.Choice(name="DALL-E v2", value="dalle-2"),
         app_commands.Choice(name="EMI Anime", value="emi"),
         app_commands.Choice(name="Any Dark", value="any-dark"),
@@ -274,8 +273,7 @@ async def run_discord_bot():
         try:
             await interaction.response.defer()
 
-            # Ждем g4f обновления чтобы заменить на AsyncClient
-            response = await asyncio.to_thread(client.images.generate, model=image_model.value, prompt=prompt)
+            response = await client.images.generate(model=image_model.value, prompt=prompt)
 
             if response.data:
                 image_url = response.data[0].url
