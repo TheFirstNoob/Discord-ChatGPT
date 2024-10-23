@@ -5,11 +5,11 @@ import discord
 import aiohttp
 from src.log import logger
 from typing import Optional
-from g4f.client import AsyncClient
+from g4f.client import Client
 from src.aclient import discordClient
 from discord import app_commands, Attachment
 
-client = AsyncClient()
+client = Client()
 
 async def run_discord_bot():
     @discordClient.event
@@ -76,6 +76,7 @@ async def run_discord_bot():
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
         await discordClient.enqueue_message(interaction, message, request_type)
+        print(f"asklong: Сообщение добавлено в очередь для пользователя {username}")
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
     @app_commands.choices(model=[
@@ -95,14 +96,14 @@ async def run_discord_bot():
         app_commands.Choice(name="LLaMa v3.2 90B Vision", value="llama-3.2-90b"),
         app_commands.Choice(name="LLaMa v3.1 70B", value="llama-3.1-70b"),
         app_commands.Choice(name="LLaMa v3.1 405B", value="llama-3.1-405b"),
-        app_commands.Choice(name="LLaMa v3.1 Sonar 128k (Online)", value="sonar-online"),
-        app_commands.Choice(name="LLaMa v3.1 Sonar 128k Chat", value="sonar-chat"),
+        app_commands.Choice(name="Llama v3.1 Nemotron 70B (Nvidia)", value="nemotron-70b"),
+        app_commands.Choice(name="LLaMa v3.1 Sonar 128k (Chat)", value="sonar-chat"),
         app_commands.Choice(name="Solar Pro", value="solar-pro"),
         app_commands.Choice(name="Qwen v2 72B", value="qwen-2-72b"),
         app_commands.Choice(name="Mixtral-8x7B", value="mixtral-8x7b"),
         app_commands.Choice(name="Yi Hermes 34B", value="yi-34b"),
         app_commands.Choice(name="SparkDesk v1.1", value="SparkDesk-v1.1"),
-        app_commands.Choice(name="Phi v3.5 Mini Microsoft", value="phi-3.5-mini"),
+        app_commands.Choice(name="Phi v3.5 Mini (Microsoft)", value="phi-3.5-mini"),
     ])
     async def chat_model(interaction: discord.Interaction, model: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
@@ -111,22 +112,9 @@ async def run_discord_bot():
         await discordClient.set_user_model(user_id, model.value)
 
         selected_provider = await discordClient.get_provider_for_model(model.value)
-        discordClient.chatBot = AsyncClient(provider=selected_provider)
+        discordClient.chatBot = Client(provider=selected_provider)
 
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
-
-        model_warnings = {
-            "sonar-online": [
-                "> :warning: **Эта модель имеет свой доступ в интернет, в отличии от request_type, но не поддерживает контекст диалога!**",
-                "> :warning: **Эта модель может работать нестабильно!**"
-            ]
-        }
-
-        warning_messages = model_warnings.get(model.value)
-        if warning_messages:
-            for message in warning_messages:
-                await interaction.followup.send(message)
-
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
 
     @discordClient.tree.command(name="reset", description="Сброс истории запросов")
@@ -191,6 +179,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="3.3.2", value="3.3.2"),
         app_commands.Choice(name="3.3.1", value="3.3.1"),
         app_commands.Choice(name="3.3.0", value="3.3.0"),
         app_commands.Choice(name="3.2.0", value="3.2.0"),
@@ -245,10 +234,14 @@ async def run_discord_bot():
         image_model="Выберите модель для генерации изображения"
     )
     @app_commands.choices(image_model=[
+        # Часть моделей временно выключена из-за ошибки G4F
         app_commands.Choice(name="Stable Diffusion XL", value="sdxl"),
+        #app_commands.Choice(name="Stable Diffusion XL Lora", value="sdxl-lora"),
+        #app_commands.Choice(name="Stable Diffusion XL Turbo", value="sdxl-turbo"),
         app_commands.Choice(name="Stable Diffusion v3", value="sd-3"),
         app_commands.Choice(name="Playground v2.5", value="playground-v2.5"),
-        app_commands.Choice(name="FLUX", value="flux"),
+        #app_commands.Choice(name="Midjourney", value="midjourney"),
+        app_commands.Choice(name="FLUX Pro", value="flux"),
         app_commands.Choice(name="FLUX 4o", value="flux-4o"),
         app_commands.Choice(name="FLUX Schnell", value="flux-schnell"),
         app_commands.Choice(name="FLUX Realism", value="flux-realism"),
@@ -256,9 +249,8 @@ async def run_discord_bot():
         app_commands.Choice(name="FLUX 3D", value="flux-3d"),
         app_commands.Choice(name="FLUX Disney", value="flux-disney"),
         app_commands.Choice(name="FLUX Pixel", value="flux-pixel"),
-        app_commands.Choice(name="DALL-E v3", value="dalle-3"),
-        app_commands.Choice(name="DALL-E v2", value="dalle-2"),
-        app_commands.Choice(name="EMI Anime", value="emi"),
+        #app_commands.Choice(name="DALL-E v2", value="dalle-2"),
+        #app_commands.Choice(name="EMI Anime", value="emi"),
         app_commands.Choice(name="Any Dark", value="any-dark"),
     ])
     
@@ -273,7 +265,7 @@ async def run_discord_bot():
         try:
             await interaction.response.defer()
 
-            response = await client.images.generate(model=image_model.value, prompt=prompt)
+            response = await client.images.async_generate(model=image_model.value, prompt=prompt)
 
             if response.data:
                 image_url = response.data[0].url

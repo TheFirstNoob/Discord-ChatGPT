@@ -11,28 +11,25 @@ from discord import app_commands
 from duckduckgo_search import AsyncDDGS
 from bs4 import BeautifulSoup
 import g4f.debug
-from g4f.client import AsyncClient
+from g4f.client import Client
 from g4f.stubs import ChatCompletion
 from g4f.Provider import (
     Allyfy,
     Airforce,
-    AIChatFree,
+    AiMathGPT,
+    Ai4Chat,
     Blackbox,
-    Binjie,
-    ChatGot,
     ChatgptFree,
     ChatGptEs,
     DeepInfraChat,
     DDG,
     FreeChatgpt,
     Free2GPT,
-    GPROChat,
     HuggingChat,
-    MagickPen,
-    Nexra,
-    ReplicateHome,
-    Liaobots,
-    LiteIcoding,
+    NexraChatGPT,
+    NexraChatGPT4o,
+    NexraBlackbox,
+    RubiksAI,
     PerplexityLabs,
     TeachAnything,
     Pizzagpt,
@@ -41,6 +38,7 @@ from g4f.Provider import (
     RetryProvider
 )
 
+client = Client()
 load_dotenv()
 
 g4f.debug.logging = True
@@ -70,27 +68,27 @@ class RetryProvider:
 def _initialize_providers():
     return {
         # Chat providers
-        "gpt-3.5-turbo": [FreeChatgpt, Nexra, Allyfy],
-        "gpt-4": [Nexra, Binjie, Airforce],
-        "gpt-4-turbo": [Nexra, Airforce, Liaobots],
-        "gpt-4o-mini": [Pizzagpt, ChatgptFree, ChatGptEs, Airforce, MagickPen, DDG, Liaobots],
-        "gpt-4o": [Blackbox, LiteIcoding, ChatGptEs, Airforce, Nexra, Liaobots],
-        "claude-3-haiku": [DDG, Airforce, Liaobots],
-        "claude-3.5-sonnet": [Blackbox, Airforce, Liaobots],
-        "blackbox": [Blackbox],
-        "gemini-flash": [Blackbox, Airforce, Liaobots],
-        "gemini-pro": [Blackbox, ChatGot, Airforce, GPROChat, AIChatFree, Nexra, Liaobots],
-        "gemma-2b-27b": [Airforce, DeepInfraChat],
+        "gpt-3.5-turbo": [FreeChatgpt, NexraChatGPT, Allyfy],
+        "gpt-4": [NexraChatGPT, Ai4Chat, Airforce],
+        "gpt-4-turbo": [Airforce],
+        "gpt-4o-mini": [Pizzagpt, ChatgptFree, RubiksAI, Airforce, ChatGptEs, DDG],
+        "gpt-4o": [Blackbox, NexraChatGPT4o, ChatGptEs, Airforce],
+        "claude-3-haiku": [DDG, Airforce],
+        "claude-3.5-sonnet": [Blackbox, Airforce],
+        "blackbox": [Blackbox, NexraBlackbox],
+        "gemini-flash": [Blackbox, Airforce],
+        "gemini-pro": [Blackbox, Airforce],
+        "gemma-2b-27b": [Airforce],
         "command-r-plus": [HuggingChat],
-        "llama-3.1-70b": [HuggingChat, Blackbox, DeepInfraChat, TeachAnything, Free2GPT, Airforce, DDG],
+        "llama-3.1-70b": [HuggingChat, Blackbox, DeepInfraChat, TeachAnything, Free2GPT, AiMathGPT, Airforce, DDG],
         "llama-3.1-405b": [Blackbox, Airforce],
         "llama-3.2-11b": [HuggingChat],
         "llama-3.2-90b": [Airforce],
-        "sonar-online": [PerplexityLabs],
+        "nemotron-70b": [HuggingChat],
         "sonar-chat": [PerplexityLabs],
         "solar-pro": [Upstage],
         "qwen-2-72b": [Airforce, HuggingChat],
-        "mixtral-8x7b": [HuggingChat, ReplicateHome, DDG],
+        "mixtral-8x7b": [HuggingChat, DDG],
         "yi-34b": [Airforce],
         "SparkDesk-v1.1": [FreeChatgpt],
         "phi-3.5-mini": [HuggingChat],
@@ -107,8 +105,8 @@ class DiscordClient(discord.Client):
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
 
-        self.default_provider = RetryProvider([Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG, Liaobots], shuffle=False)
-        self.chatBot = AsyncClient(provider=self.default_provider)
+        self.default_provider = RetryProvider([Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG], shuffle=False)
+        self.chatBot = Client(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
 
@@ -227,8 +225,8 @@ class DiscordClient(discord.Client):
         while True:
             try:
                 provider = retry_provider.get_next_provider()
-                self.chatBot = AsyncClient(provider=provider)
-                response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
+                self.chatBot = Client(provider=provider)
+                response: ChatCompletion = await self.chatBot.chat.completions.async_create(model=user_model, messages=conversation_history)
                 break
             except Exception as e:
                 logger.exception(f"handle_response: Ошибка с провайдером {provider}: {e}")
