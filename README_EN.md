@@ -63,7 +63,7 @@
    - Manage Message
    - Manage Thread (if needed - optional)
    - Read Message History
-   - Attach Files (for future updates)
+   - Attach Files
    - Embed Links
    - Use Slash Commands
 6. Copy the generated link and follow it.
@@ -98,13 +98,13 @@
 | Command        | Description                                  |
 |----------------|----------------------------------------------|
 | `/help`        | Display the list of commands                 | 
-| `/modelinfo`   | Information about the AI model               |
-| `/about `       | Information about the project                |
-| `/changelog`  | Information about changes                   |
+| `/about `      | Information about the project                |
+| `/changelog`   | Information about changes                    |
 
 ### Management
-| Command        | Description                                  |
-|----------------|----------------------------------------------|
-| `/reset`       | Reset conversation history                 |
-| `/chat-model` | Switch chat model                          |
-| `/history`     | Download conversation history              | 
+| Command        			| Description                                  	|
+|---------------------------|-----------------------------------------------|
+| `/reset`       			| Reset conversation history                 	|
+| `/chat-model` 			| Switch chat model                          	|
+| `/chat-model-uncensored` 	| Switch chat model (Uncensored)             	|
+| `/history`     			| Download conversation history              	| 
