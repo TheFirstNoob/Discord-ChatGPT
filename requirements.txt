@@ -1,8 +1,12 @@
 discord.py==2.4.0
+audioop-lts; python_version>='3.13'
 python-dotenv==1.0.1
 asgiref==3.8.1
-selenium==4.24.0
+selenium==4.26.1
 aiofiles==24.1.0
-aiohttp==3.10.5
-g4f==0.3.3.2
+aiohttp==3.10.10
+beautifulsoup4==4.12.3
+duckduckgo_search==6.3.4
+nest_asyncio==1.6.0
+g4f==0.3.3.4
 g4f[all]

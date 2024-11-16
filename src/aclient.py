@@ -14,26 +14,19 @@ import g4f.debug
 from g4f.client import Client
 from g4f.stubs import ChatCompletion
 from g4f.Provider import (
-    Allyfy,
+    AIUncensored,
     Airforce,
-    AiMathGPT,
-    Ai4Chat,
     Blackbox,
-    ChatgptFree,
     ChatGptEs,
-    DeepInfraChat,
     DDG,
-    FreeChatgpt,
     Free2GPT,
     HuggingChat,
-    NexraChatGPT,
-    NexraChatGPT4o,
-    NexraBlackbox,
-    RubiksAI,
+    HuggingFace,
     PerplexityLabs,
     TeachAnything,
     Pizzagpt,
-    Upstage,
+    Mhystical,
+    ReplicateHome,
     
     RetryProvider
 )
@@ -68,30 +61,36 @@ class RetryProvider:
 def _initialize_providers():
     return {
         # Chat providers
-        "gpt-3.5-turbo": [FreeChatgpt, NexraChatGPT, Allyfy],
-        "gpt-4": [NexraChatGPT, Ai4Chat, Airforce],
+        "gpt-3.5-turbo": [Airforce],
+        "gpt-4": [Mhystical],
         "gpt-4-turbo": [Airforce],
-        "gpt-4o-mini": [Pizzagpt, ChatgptFree, RubiksAI, Airforce, ChatGptEs, DDG],
-        "gpt-4o": [Blackbox, NexraChatGPT4o, ChatGptEs, Airforce],
+        "gpt-4o-mini": [Pizzagpt, Airforce, ChatGptEs, DDG],
+        "gpt-4o": [Blackbox, ChatGptEs, Airforce],
         "claude-3-haiku": [DDG, Airforce],
         "claude-3.5-sonnet": [Blackbox, Airforce],
-        "blackbox": [Blackbox, NexraBlackbox],
+        "blackbox": [Blackbox],
+        "blackbox-pro": [Blackbox],
         "gemini-flash": [Blackbox, Airforce],
         "gemini-pro": [Blackbox, Airforce],
         "gemma-2b-27b": [Airforce],
         "command-r-plus": [HuggingChat],
-        "llama-3.1-70b": [HuggingChat, Blackbox, DeepInfraChat, TeachAnything, Free2GPT, AiMathGPT, Airforce, DDG],
+        "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, Airforce, DDG],
         "llama-3.1-405b": [Blackbox, Airforce],
-        "llama-3.2-11b": [HuggingChat],
+        "llama-3.2-11b": [HuggingChat, HuggingFace],
         "llama-3.2-90b": [Airforce],
         "nemotron-70b": [HuggingChat],
         "sonar-chat": [PerplexityLabs],
-        "solar-pro": [Upstage],
-        "qwen-2-72b": [Airforce, HuggingChat],
+        "lfm-40b": [PerplexityLabs],
+        "qwen-2-72b": [HuggingChat],
         "mixtral-8x7b": [HuggingChat, DDG],
+        "mixtral-8x22b": [Airforce],
         "yi-34b": [Airforce],
-        "SparkDesk-v1.1": [FreeChatgpt],
         "phi-3.5-mini": [HuggingChat],
+
+        #"ai_uncensored": [AIUncensored],
+        "any_uncensored": [Airforce],
+
+        "llava-13b": [ReplicateHome], #vision model for later
     }
 
 class DiscordClient(discord.Client):
@@ -105,7 +104,8 @@ class DiscordClient(discord.Client):
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
 
-        self.default_provider = RetryProvider([Pizzagpt, ChatgptFree, ChatGptEs, Airforce, DDG], shuffle=False)
+        default_providers = self.providers_dict.get(self.default_model, [])
+        self.default_provider = RetryProvider(default_providers, shuffle=False)
         self.chatBot = Client(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
@@ -165,16 +165,18 @@ class DiscordClient(discord.Client):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
-                    if response.status != 200:
-                        raise Exception(f"HTTP статус: {response.status}")
+                    response.raise_for_status()
                     html = await response.text()
                     soup = BeautifulSoup(html, 'html.parser')
-                    title = soup.title.text
+                    title = soup.title.text if soup.title else "Без названия"
                     paragraphs = [p.text for p in soup.find_all('p')]
                     return title, '\n'.join(paragraphs)
+        except aiohttp.ClientError as e:
+            logger.error(f"Ошибка сети при получении информации с {url}: {e}")
+            return None, "Ошибка сети. Пожалуйста, попробуйте позже."
         except Exception as e:
-            logger.exception(f"get_website_info: Ошибка при получении информации с сайта: {e}")
-            return None, "Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите (Ваше имя) если ошибка повторяется несколько раз"
+            logger.exception(f"Не удалось получить информацию с сайта {url}: {e}")
+            return None, f"Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите {os.environ.get('ADMIN_NAME')} если ошибка повторяется несколько раз."
 
     async def enqueue_message(self, message, user_message, request_type):
         await self.message_queue.put((message, user_message, request_type))
@@ -222,17 +224,26 @@ class DiscordClient(discord.Client):
 
         retry_provider = await self.get_provider_for_model(user_model)
         retry_provider.reset()
-        while True:
+        
+        attempts = 0
+        max_attempts = len(retry_provider.providers)
+
+        while attempts < max_attempts:
             try:
                 provider = retry_provider.get_next_provider()
+                logger.info(f"Текущий провайдер выбран: {provider}")  # Will be remove later
                 self.chatBot = Client(provider=provider)
                 response: ChatCompletion = await self.chatBot.chat.completions.async_create(model=user_model, messages=conversation_history)
                 break
             except Exception as e:
                 logger.exception(f"handle_response: Ошибка с провайдером {provider}: {e}")
-                continue
+                attempts += 1
 
-        model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия (Ваш бот):** *{os.environ.get('VERSION_BOT')}*"
+        if attempts == max_attempts:
+            # Все провайдеры не работают
+            return ":x: **ОШИБКА:** К сожалению, все провайдеры недоступны. Пожалуйста, попробуйте позже или смените модель."
+
+        model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия {os.environ.get('BOT_NAME')}:** *{os.environ.get('VERSION_BOT')}*"
         bot_response = response.choices[0].message.content
         conversation_history.append({'role': 'assistant', 'content': bot_response})
 
