@@ -6,17 +6,21 @@ import unittest
 import json
 import logging
 import time
+import g4f.debug
 
-from g4f.client import Client
+from g4f.client import AsyncClient
 from g4f.Provider import RetryProvider
 from src.aclient import _initialize_providers
 
-client = Client()
+client = AsyncClient()
+
+g4f.debug.logging = True
+g4f.debug.version_check = True
 
 class ColoredFormatter(logging.Formatter):
     INFO_COLOR = '\x1b[34;1m'  # Синий
     ERROR_COLOR = '\x1b[31m'   # Красный
-    RESET_COLOR = '\x1b[0m'    # Сброс цвета
+    RESET_COLOR = '\x1b[0m'    # Цвет сброса
 
     def format(self, record):
         if record.levelno == logging.INFO:
@@ -25,21 +29,20 @@ class ColoredFormatter(logging.Formatter):
             record.msg = f"{self.ERROR_COLOR}{record.msg}{self.RESET_COLOR}"
         return super().format(record)
 
-# Настройка логирования
 handler = logging.StreamHandler()
 handler.setFormatter(ColoredFormatter('%(message)s'))
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.ERROR)
+logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-# Конфиг
+# Настройки
 CONFIG = {
-    "timeout": 30,  # Тайм-аут в секундах
+    "timeout": 60,  # Время ожидания ответа провайдера (В секундах)
+    "parallel_execution": False  # Установите: True для параллельной работы, False для последовательной
 }
 
 class AITests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        """Инициализация провайдеров перед каждым тестом."""
         self.providers = {}
         models = _initialize_providers()
         for model in models:
@@ -48,28 +51,42 @@ class AITests(unittest.IsolatedAsyncioTestCase):
         self.results = []
 
     async def test_provider_availability(self):
-        """Тест доступности всех провайдеров."""
         sys.tracebacklimit = 0
 
+        if CONFIG["parallel_execution"]:
+            await self.test_provider_availability_parallel()
+        else:
+            await self.test_provider_availability_sequential()
+            
+        self.save_results_to_file("results.json")
+
+    async def test_provider_availability_parallel(self):
+        tasks = []
+        for model, provider in self.iterate_providers():
+            task = asyncio.create_task(self.check_provider(model, provider))
+            tasks.append(task)
+
+        await asyncio.gather(*tasks)
+
+    async def test_provider_availability_sequential(self):
+        for model, provider in self.iterate_providers():
+            await self.check_provider(model, provider)
+
+    def iterate_providers(self):
         for model in self.providers:
             for provider in self.providers[model].providers:
-                await self.check_provider(model, provider)
-
-        # Сохранение результатов в JSON файл
-        with open('results.json', 'w', encoding='utf-8') as f:
-            json.dump(self.results, f, ensure_ascii=False, indent=4)
+                yield model, provider
 
     async def check_provider(self, model, provider):
-        """Проверка конкретного провайдера с тайм-аутом."""
         provider_name = provider.__name__
-        logger.info(f"[?] Отправляю запрос провайдеру {provider_name} используя модель {model}")
+        logger.info(f"[?] Отправляем запрос к модели: {model} Провайдер: {provider_name}")
 
         try:
             start_time = time.time()
             response = await asyncio.wait_for(
-                client.chat.completions.async_create(
+                client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": "Hello"}],
+                    messages=[{"role": "user", "content": "Hello!"}],
                     provider=provider
                 ),
                 timeout=CONFIG["timeout"]
@@ -78,32 +95,43 @@ class AITests(unittest.IsolatedAsyncioTestCase):
             res = response.choices[0].message.content
 
             if not res:
-                raise ValueError("Ответ пустой.")
+                logger.error(f"[-] Пустой ответ от модели: {model} Провайдер: {provider_name}.")
+                self.results.append(self.create_error_result(model, provider_name, "Пустой ответ."))
+                return
 
-            logger.info(f"[+] Ответ от модели {model} провайдера {provider_name} за {elapsed_time:.2f} сек: {res}")
-            self.results.append({
-                "model": model,
-                "provider": provider_name,
-                "response": res,
-                "response_time": elapsed_time
-            })
+            logger.info(f"[+] Успешный ответ от модели: {model} Провайдер: {provider_name} за {elapsed_time:.2f} сек: {res}")
+            self.results.append(self.create_success_result(model, provider_name, res, elapsed_time))
 
         except asyncio.TimeoutError:
-            logger.error(f"[-] Тайм-аут при запросе к модели {model} провайдера {provider_name}.")
-            self.results.append({
-                "model": model,
-                "provider": provider_name,
-                "error": "Тайм-аут! Провайдер не ответил за отведенное время."
-            })
+            logger.error(f"[-] Тайм-аут модели: {model} Провайдер: {provider_name}.")
+            self.results.append(self.create_error_result(model, provider_name, "Тайм-Аут! Провайдер не ответил за требуемое время."))
 
         except Exception as e:
-            err = str(e)
-            logger.error(f"[-] Ошибка при отправке запроса к модели {model} провайдера {provider_name}: {err}")
-            self.results.append({
-                "model": model,
-                "provider": provider_name,
-                "error": err
-            })
+            logger.error(f"[-] Ошибка при отправке запроса к модели: {model} Провайдер: {provider_name}: {str(e)}")
+            self.results.append(self.create_error_result(model, provider_name, str(e)))
+
+    def create_success_result(self, model, provider_name, response, elapsed_time):
+        return {
+            "model": model,
+            "provider": provider_name,
+            "response": response,
+            "response_time": elapsed_time
+        }
+
+    def create_error_result(self, model, provider_name, error):
+        return {
+            "model": model,
+            "provider": provider_name,
+            "error": error
+        }
+
+    def save_results_to_file(self, filename):
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(self.results, f, ensure_ascii=False, indent=4)
+            logger.info(f"[+] Результат сохранен в файл: {filename}")
+        except IOError as e:
+            logger.error(f"[-] Ошибка сохранения результата: {filename}: {str(e)}")
 
 if __name__ == '__main__':
     unittest.main()

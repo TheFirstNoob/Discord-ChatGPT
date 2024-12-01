@@ -3,13 +3,15 @@ import re
 import asyncio
 import discord
 import aiohttp
+import mimetypes
 from src.log import logger
 from typing import Optional
-from g4f.client import Client
+from pdfminer.high_level import extract_text
+from g4f.client import AsyncClient
 from src.aclient import discordClient
 from discord import app_commands, Attachment
 
-client = Client()
+client = AsyncClient()
 
 async def run_discord_bot():
     @discordClient.event
@@ -45,7 +47,7 @@ async def run_discord_bot():
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
         await discordClient.enqueue_message(interaction, message, request_type)
-        
+
     @discordClient.tree.command(name="asklong", description="Задать длинный вопрос ChatGPT через текст и файл")
     @app_commands.describe(
         message="Введите ваш запрос",
@@ -65,23 +67,65 @@ async def run_discord_bot():
 
         username = str(interaction.user)
         discordClient.current_channel = interaction.channel
+        mime_type, _ = mimetypes.guess_type(file.filename)
+
+        if mime_type is None or not mime_type.startswith('text/'):
+            await interaction.followup.send(f"> :x: **ОШИБКА:** Поддерживаются только текстовые форматы! Загруженный файл: {file.filename}")
+            return
 
         try:
             file_content = await file.read()
             file_message = file_content.decode('utf-8')
             message = f"{message}\n\n{file_message}"
         except Exception as e:
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось прочитать файл. {str(e)}")
+            logger.exception(f"asklong: Не удалось прочитать файл: {str(e)}")
+            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось прочитать файл. Поддерживаются только текстовые форматы! {str(e)}")
             return
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
         await discordClient.enqueue_message(interaction, message, request_type)
 
+    @discordClient.tree.command(name="askpdf", description="Извлечь текст из PDF-файла и задать вопрос ИИ")
+    @app_commands.describe(
+        message="Введите ваш запрос к ИИ",
+        file="Загрузите PDF-файл для извлечения текста"
+    )
+    async def askpdf(interaction: discord.Interaction, message: str, file: Attachment):
+        await interaction.response.defer(ephemeral=False)
+
+        if interaction.user == discordClient.user:
+            return
+
+        username = str(interaction.user)
+        discordClient.current_channel = interaction.channel
+        mime_type, _ = mimetypes.guess_type(file.filename)
+
+        if mime_type != 'application/pdf':
+            await interaction.followup.send(f"> :x: **ОШИБКА:** Поддерживается только PDF-файлы! Загруженный файл: {file.filename}")
+            return
+
+        try:
+            pdf_content = await file.read()
+            pdf_path = f'temp_pdf_{interaction.user.id}.pdf'
+            with open(pdf_path, 'wb') as f:
+                f.write(pdf_content)
+
+            extracted_text = extract_text(pdf_path)
+            os.remove(pdf_path)
+
+            full_message = f"{message}\n\n{extracted_text}"
+            logger.info(f"\x1b[31m{username}\x1b[0m : /askpdf [Текст: {message}, PDF: {file.filename}] в ({discordClient.current_channel})")
+            await discordClient.enqueue_message(interaction, full_message, request_type=None)
+            
+            await interaction.followup.send("> :white_check_mark: **Ваш запрос и текст из PDF отправлены на обработку! Пожалуйста ожидайте...**")
+        except Exception as e:
+            logger.exception(f"askpdf: Ошибка при обработке PDF-файла: {e}")
+            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
+
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
     @app_commands.choices(model=[
-        app_commands.Choice(name="GPT 3.5-Turbo (OpenAI)", value="gpt-3.5-turbo"), 
+        app_commands.Choice(name="GPT 3.5-Turbo (OpenAI)", value="gpt-3.5-turbo"),
         app_commands.Choice(name="GPT 4 (OpenAI)", value="gpt-4"),
-        app_commands.Choice(name="GPT 4-Turbo (OpenAI)", value="gpt-4-turbo"),
         app_commands.Choice(name="GPT 4o-Mini (OpenAI)", value="gpt-4o-mini"),
         app_commands.Choice(name="GPT 4o (OpenAI)", value="gpt-4o"),
         app_commands.Choice(name="Claude 3 Haiku (Anthropic)", value="claude-3-haiku"),
@@ -90,20 +134,12 @@ async def run_discord_bot():
         app_commands.Choice(name="Blackbox PRO", value="blackbox-pro"),
         app_commands.Choice(name="Gemini Flash (Google)", value="gemini-flash"),
         app_commands.Choice(name="Gemini Pro (Google)", value="gemini-pro"),
-        app_commands.Choice(name="Gemma v2 27B (Google)", value="gemma-2b-27b"),
-        app_commands.Choice(name="Command R+", value="command-r-plus"),
-        app_commands.Choice(name="LLaMa v3.2 11B Vision (MetaAI)", value="llama-3.2-11b"),
-        app_commands.Choice(name="LLaMa v3.2 90B Vision (MetaAI)", value="llama-3.2-90b"),
         app_commands.Choice(name="LLaMa v3.1 70B (MetaAI)", value="llama-3.1-70b"),
         app_commands.Choice(name="LLaMa v3.1 405B (MetaAI)", value="llama-3.1-405b"),
-        app_commands.Choice(name="Llama v3.1 Nemotron 70B (Nvidia)", value="nemotron-70b"),
         app_commands.Choice(name="LLaMa v3.1 Sonar 128k Chat (MetaAI)", value="sonar-chat"),
-        app_commands.Choice(name="Qwen v2 72B", value="qwen-2-72b"),
         app_commands.Choice(name="Mixtral-8x7B", value="mixtral-8x7b"),
-        app_commands.Choice(name="Mixtral-8x22B", value="mixtral-8x22b"),
         app_commands.Choice(name="LFM 40B", value="lfm-40b"),
-        app_commands.Choice(name="Yi Hermes 34B", value="yi-34b"),
-        app_commands.Choice(name="Phi v3.5 Mini (Microsoft)", value="phi-3.5-mini"),
+        app_commands.Choice(name="LLaVa 13B Vision", value="llava-13b"),
     ])
     async def chat_model(interaction: discord.Interaction, model: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
@@ -112,28 +148,10 @@ async def run_discord_bot():
         await discordClient.set_user_model(user_id, model.value)
 
         selected_provider = await discordClient.get_provider_for_model(model.value)
-        discordClient.chatBot = Client(provider=selected_provider)
+        discordClient.chatBot = AsyncClient(provider=selected_provider)
 
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
-        
-    @discordClient.tree.command(name="chat-model-uncensored", description="Сменить модель чата (без цензуры)")
-    @app_commands.choices(model_uncensored=[
-        #app_commands.Choice(name="AI Uncensored", value="ai_uncensored"), #not respoding right now
-        app_commands.Choice(name="Any Uncensored", value="any_uncensored"),
-    ])
-    # its duplicate code like above. Later use one func.
-    async def chat_model_uncensored(interaction: discord.Interaction, model_uncensored: app_commands.Choice[str]):
-        await interaction.response.defer(ephemeral=True)
-
-        user_id = interaction.user.id
-        await discordClient.set_user_model(user_id, model_uncensored.value)
-
-        selected_provider = await discordClient.get_provider_for_model(model_uncensored.value)
-        discordClient.chatBot = Client(provider=selected_provider)
-
-        await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model_uncensored.name}.**")
-        logger.info(f"Смена модели на {model_uncensored.name} для пользователя {interaction.user}")
 
     @discordClient.tree.command(name="reset", description="Сброс истории запросов")
     async def reset(interaction: discord.Interaction):
@@ -150,7 +168,7 @@ async def run_discord_bot():
         help_file_path = 'texts/help.txt'
         if not os.path.exists(help_file_path):
             await interaction.followup.send(f"> :x: **ОШИБКА:** Файл help.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
-            logger.error(f"Файл справки не найден: {help_file_path}")
+            logger.error(f"help: Файл справки не найден: {help_file_path}")
             return
         with open(help_file_path, 'r', encoding='utf-8') as file:
             help_text = file.read()
@@ -164,7 +182,7 @@ async def run_discord_bot():
         about_file_path = 'texts/about.txt'
         if not os.path.exists(about_file_path):
             await interaction.followup.send(f"> :x: **ОШИБКА:** Файл about.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
-            logger.error(f"Файл информации не найден: {about_file_path}")
+            logger.error(f"about: Файл информации не найден: {about_file_path}")
             return
         with open(about_file_path, 'r', encoding='utf-8') as file:
             about_text = file.read().format(username=username)
@@ -173,6 +191,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="3.5.0", value="3.5.0"),
         app_commands.Choice(name="3.4.0", value="3.4.0"),
         app_commands.Choice(name="3.3.2", value="3.3.2"),
         app_commands.Choice(name="3.3.1", value="3.3.1"),
@@ -197,7 +216,7 @@ async def run_discord_bot():
         
         if not os.path.exists(version_file):
             await interaction.followup.send(f"> :x: **ОШИБКА: Файл журнала изменений для версии {version.name} не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
-            logger.error(f"Файл журнала изменений для версии {version.name} не найден: {version_file}")
+            logger.error(f"changelog: Файл журнала изменений для версии {version.name} не найден: {version_file}")
             return
         
         with open(version_file, 'r', encoding='utf-8') as file:
@@ -232,23 +251,16 @@ async def run_discord_bot():
         image_model="Выберите модель для генерации изображения"
     )
     @app_commands.choices(image_model=[
-        # Часть моделей временно выключена из-за ошибки G4F
         app_commands.Choice(name="Stable Diffusion XL", value="sdxl"),
-        #app_commands.Choice(name="Stable Diffusion XL Lora", value="sdxl-lora"),
-        #app_commands.Choice(name="Stable Diffusion XL Turbo", value="sdxl-turbo"),
         app_commands.Choice(name="Stable Diffusion v3", value="sd-3"),
         app_commands.Choice(name="Playground v2.5", value="playground-v2.5"),
-        #app_commands.Choice(name="Midjourney", value="midjourney"),
         app_commands.Choice(name="FLUX Pro", value="flux"),
         app_commands.Choice(name="FLUX 4o", value="flux-4o"),
-        #app_commands.Choice(name="FLUX Schnell", value="flux-schnell"),
         app_commands.Choice(name="FLUX Realism", value="flux-realism"),
         app_commands.Choice(name="FLUX Anime", value="flux-anime"),
         app_commands.Choice(name="FLUX 3D", value="flux-3d"),
         app_commands.Choice(name="FLUX Disney", value="flux-disney"),
         app_commands.Choice(name="FLUX Pixel", value="flux-pixel"),
-        #app_commands.Choice(name="DALL-E v2", value="dalle-2"),
-        #app_commands.Choice(name="EMI Anime", value="emi"),
         app_commands.Choice(name="Any Dark", value="any-dark"),
     ])
     
@@ -263,9 +275,11 @@ async def run_discord_bot():
         try:
             await interaction.response.defer()
 
-            response = await client.images.async_generate(model=image_model.value, prompt=prompt)
+            response = await client.images.generate(model=image_model.value, prompt=prompt)
+            print(response)
 
             if response.data:
+                print(response.data)
                 image_url = response.data[0].url
 
                 async with aiohttp.ClientSession() as session:
@@ -283,9 +297,12 @@ async def run_discord_bot():
                             os.remove(image_path)
                         else:
                             await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось загрузить изображение. Код ошибки: {image_response.status}")
+                            logger.error(f"draw: Не удалось загрузить изображение. Код ошибки: {image_response.status}")
             else:
                 await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение.")
+                logger.error("draw: Не удалось сгенерировать изображение. Ответ не содержит данных.")
         except Exception as e:
+            logger.error(f"draw: Ошибка при выполнении команды: {str(e)}")
             await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")

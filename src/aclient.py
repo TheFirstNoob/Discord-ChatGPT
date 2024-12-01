@@ -11,7 +11,7 @@ from discord import app_commands
 from duckduckgo_search import AsyncDDGS
 from bs4 import BeautifulSoup
 import g4f.debug
-from g4f.client import Client
+from g4f.client import AsyncClient
 from g4f.stubs import ChatCompletion
 from g4f.Provider import (
     AIUncensored,
@@ -19,22 +19,21 @@ from g4f.Provider import (
     Blackbox,
     ChatGptEs,
     DDG,
+    DarkAI,
     Free2GPT,
-    HuggingChat,
-    HuggingFace,
+    GizAI,
     PerplexityLabs,
     TeachAnything,
-    Pizzagpt,
     Mhystical,
     ReplicateHome,
     
     RetryProvider
 )
 
-client = Client()
+client = AsyncClient()
 load_dotenv()
 
-g4f.debug.logging = True
+g4f.debug.logging = os.getenv("G4F_DEBUG", "True")
 user_data_cache = {}
 
 SYSTEM_DATA_FILE = 'system.json'
@@ -50,7 +49,7 @@ class RetryProvider:
 
     def get_next_provider(self):
         if self.current_index >= len(self.providers):
-            raise Exception("All providers failed")
+            raise Exception("Все провайдеры не ответили!")
         provider = self.providers[self.current_index]
         self.current_index += 1
         return provider
@@ -61,36 +60,23 @@ class RetryProvider:
 def _initialize_providers():
     return {
         # Chat providers
-        "gpt-3.5-turbo": [Airforce],
+        "gpt-3.5-turbo": [DarkAI],
         "gpt-4": [Mhystical],
-        "gpt-4-turbo": [Airforce],
-        "gpt-4o-mini": [Pizzagpt, Airforce, ChatGptEs, DDG],
-        "gpt-4o": [Blackbox, ChatGptEs, Airforce],
-        "claude-3-haiku": [DDG, Airforce],
-        "claude-3.5-sonnet": [Blackbox, Airforce],
+        "gpt-4o-mini": [Airforce, ChatGptEs, DDG],
+        "gpt-4o": [Blackbox, ChatGptEs, Airforce, DarkAI],
+        "claude-3-haiku": [DDG],
+        "claude-3.5-sonnet": [Blackbox],
         "blackbox": [Blackbox],
         "blackbox-pro": [Blackbox],
-        "gemini-flash": [Blackbox, Airforce],
-        "gemini-pro": [Blackbox, Airforce],
-        "gemma-2b-27b": [Airforce],
-        "command-r-plus": [HuggingChat],
-        "llama-3.1-70b": [HuggingChat, Blackbox, TeachAnything, Free2GPT, Airforce, DDG],
-        "llama-3.1-405b": [Blackbox, Airforce],
-        "llama-3.2-11b": [HuggingChat, HuggingFace],
-        "llama-3.2-90b": [Airforce],
-        "nemotron-70b": [HuggingChat],
+        "gemini-flash": [Blackbox, GizAI],
+        "gemini-pro": [Blackbox],
+        "llama-3.1-70b": [Blackbox, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
+        "llama-3.1-405b": [Blackbox, DarkAI],
         "sonar-chat": [PerplexityLabs],
         "lfm-40b": [PerplexityLabs],
-        "qwen-2-72b": [HuggingChat],
-        "mixtral-8x7b": [HuggingChat, DDG],
-        "mixtral-8x22b": [Airforce],
-        "yi-34b": [Airforce],
-        "phi-3.5-mini": [HuggingChat],
+        "mixtral-8x7b": [DDG],
 
-        #"ai_uncensored": [AIUncensored],
-        "any_uncensored": [Airforce],
-
-        "llava-13b": [ReplicateHome], #vision model for later
+        "llava-13b": [ReplicateHome], # vision for later
     }
 
 class DiscordClient(discord.Client):
@@ -100,13 +86,13 @@ class DiscordClient(discord.Client):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
         self.providers_dict = _initialize_providers()
-        self.default_model = os.getenv("MODEL")
+        self.default_model = os.getenv("MODEL", "blackbox")
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
 
         default_providers = self.providers_dict.get(self.default_model, [])
         self.default_provider = RetryProvider(default_providers, shuffle=False)
-        self.chatBot = Client(provider=self.default_provider)
+        self.chatBot = AsyncClient(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
 
@@ -134,30 +120,33 @@ class DiscordClient(discord.Client):
             
     async def process_request(self, query, request_type="search", max_results=3):
         if request_type == 'search':
-            print(f"Поиск по запросу: {query}")
+            logger.info(f"Поиск по запросу: {query}")
             results = await AsyncDDGS().atext(query, max_results=max_results)
+            tasks = [self.get_website_info(result.get('href')) for result in results if result.get('href')]
+            website_info = await asyncio.gather(*tasks)
             conversation_history = []
-            for result in results:
-                url = result.get('href')
-                if url:
-                    title, paragraphs = await self.get_website_info(url)
-                    if title and paragraphs:
-                        conversation_history.append(f"Ссылка на ресурс: {url}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
+            for title, paragraphs in website_info:
+                if title and paragraphs:
+                    conversation_history.append(f"Ссылка на ресурс: {result.get('href')}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
             return conversation_history
         elif request_type == 'images':
-            print(f"Картинки по запросу: {query}")
+            logger.info(f"Картинки по запросу: {query}")
             results = await AsyncDDGS().aimages(query, max_results=5)
-            image_links = [result['image'] for result in results]
+            image_links = [result['image'] for result in results if result.get('image')]
+            if not image_links:
+                return [f"Не удалось найти картинки по запросу '{query}'."]
             return [
-                f"Картинки по запросу '{query}' полученному от пользователя:" +
+                f"Картинки по запросу '{query}':\n" +
                 "\n".join(image_links)
             ]
         elif request_type == 'videos':
-            print(f"Поиск видео по запросу: {query}")
+            logger.info(f"Поиск видео по запросу: {query}")
             results = await AsyncDDGS().avideos(query, max_results=5)
-            media_links = [result['content'] for result in results]
+            media_links = [result['content'] for result in results if result.get('content')]
+            if not media_links:
+                return [f"Не удалось найти видео по запросу '{query}'."]
             return [
-                f"Видео по запросу '{query}' полученному от пользователя:" +
+                f"Видео по запросу '{query}':\n" +
                 "\n".join(media_links)
             ]
 
@@ -172,14 +161,13 @@ class DiscordClient(discord.Client):
                     paragraphs = [p.text for p in soup.find_all('p')]
                     return title, '\n'.join(paragraphs)
         except aiohttp.ClientError as e:
-            logger.error(f"Ошибка сети при получении информации с {url}: {e}")
+            logger.error(f"get_website_info: Ошибка сети при получении информации с {url}: {e}")
             return None, "Ошибка сети. Пожалуйста, попробуйте позже."
         except Exception as e:
-            logger.exception(f"Не удалось получить информацию с сайта {url}: {e}")
+            logger.exception(f"get_website_info: Не удалось получить информацию с сайта {url}: {e}")
             return None, f"Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите {os.environ.get('ADMIN_NAME')} если ошибка повторяется несколько раз."
-
-    async def enqueue_message(self, message, user_message, request_type):
-        await self.message_queue.put((message, user_message, request_type))
+        async def enqueue_message(self, message, user_message, request_type):
+            await self.message_queue.put((message, user_message, request_type))
 
     async def send_message(self, message, user_message, request_type):
         user_id = message.user.id
@@ -201,9 +189,9 @@ class DiscordClient(discord.Client):
                 response = await self.handle_response(None, self.starting_prompt)
                 await channel.send(f"{response}")
 
-                logger.info("Ответ от ИИ получен. Функция отработала корректно!")
+                logger.info("send_start_prompt: Ответ от ИИ получен. Функция отработала корректно!")
             else:
-                logger.info("Не установлены системные инструкции или не выбран Discord канал. Пропуск отправки `send_start_prompt` функции.")
+                logger.info("send_start_prompt: Не установлены системные инструкции или не выбран Discord канал. Пропуск отправки `send_start_prompt` функции.")
         except Exception as e:
             logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
 
@@ -220,28 +208,39 @@ class DiscordClient(discord.Client):
         if request_type:
             search_results = await self.process_request(user_message, request_type=request_type, max_results=3)
             for result in search_results:
-                conversation_history.append({'role': 'assistant', 'content': f"[!!!СИСТЕМНАЯ ИНСТРУКЦИЯ!!! ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ ПОЛЬЗОВАТЕЛЮ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, И ОБЯЗАТЕЛЬНО УКАЖИ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА, ТО СООБЩИ ПОЛЬЗОВАТЕЛЮ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ. ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ КАРТИНКИ ИЛИ ВИДЕО, ТО ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА!]: Результат поиска: {result}"})
+                instruction = (
+                    "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. "
+                    "ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ ПОЛЬЗОВАТЕЛЮ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, "
+                    "И ОБЯЗАТЕЛЬНО УКАЖИ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА, "
+                    "ТО СООБЩИ ПОЛЬЗОВАТЕЛЮ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ. "
+                    "ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ КАРТИНКИ ИЛИ ВИДЕО, ТО ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА!]: "
+                    f"Результат поиска: {result}"
+                )
+                conversation_history.append({'role': 'assistant', 'content': instruction})
 
         retry_provider = await self.get_provider_for_model(user_model)
         retry_provider.reset()
         
         attempts = 0
         max_attempts = len(retry_provider.providers)
+        last_error = None
 
         while attempts < max_attempts:
             try:
                 provider = retry_provider.get_next_provider()
-                logger.info(f"Текущий провайдер выбран: {provider}")  # Will be remove later
-                self.chatBot = Client(provider=provider)
-                response: ChatCompletion = await self.chatBot.chat.completions.async_create(model=user_model, messages=conversation_history)
+                logger.info(f"handle_response: Текущий провайдер выбран: {provider}")
+                self.chatBot = AsyncClient(provider=provider)
+                response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
                 break
             except Exception as e:
                 logger.exception(f"handle_response: Ошибка с провайдером {provider}: {e}")
+                last_error = e
                 attempts += 1
 
         if attempts == max_attempts:
-            # Все провайдеры не работают
-            return ":x: **ОШИБКА:** К сожалению, все провайдеры недоступны. Пожалуйста, попробуйте позже или смените модель."
+            return (":x: **ОШИБКА:** К сожалению, все провайдеры для этой модели недоступны. "
+                    "Пожалуйста, попробуйте позже или смените модель.\n\n"
+                    f"**Код ошибки:** ```{last_error}```")
 
         model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия {os.environ.get('BOT_NAME')}:** *{os.environ.get('VERSION_BOT')}*"
         bot_response = response.choices[0].message.content
@@ -282,7 +281,7 @@ class DiscordClient(discord.Client):
                 user_data_cache[user_id] = json.loads(data)
                 return user_data_cache[user_id]
         else:
-            initial_data = {'history': [], 'model': os.getenv("MODEL")}
+            initial_data = {'history': [], 'model': self.default_model}
             await self.save_user_data(user_id, initial_data)
             return initial_data
 

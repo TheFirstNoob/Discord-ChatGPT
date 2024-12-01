@@ -26,6 +26,7 @@
 * 🧠 **AI Usage:** Most of the modified code is written with the help of ChatGPT and other AIs for experimentation.
 * 💬 **Multifunctionality:** The bot can communicate both in a Discord channel and in private messages.
 * 🌐 **Internet Support:** The bot can perform search queries, find images, and videos using the **[duckduckgo-search](https://github.com/deedy5/duckduckgo_search)** library.
+* 📝 **Working with PDF:** The bot can analyze your PDF file for text content and interact with it using the **[pdfminer.six](https://github.com/pdfminer/pdfminer.six)** library. (Does not support images!)
 
 ---
 
@@ -92,6 +93,7 @@
 |----------------|----------------------------------------------|
 | `/ask`         | Chat with AI (separate memory in DM)         |
 | `/asklong`     | Chat with AI with a larger context request   |
+| `/askpdf`      | Chat with AI with a PDF file (Text only)     |
 | `/draw`        | Create an image using AI                     |
 
 ### Information
@@ -106,5 +108,4 @@
 |---------------------------|-----------------------------------------------|
 | `/reset`       			| Reset conversation history                 	|
 | `/chat-model` 			| Switch chat model                          	|
-| `/chat-model-uncensored` 	| Switch chat model (Uncensored)             	|
 | `/history`     			| Download conversation history              	| 

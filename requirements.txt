@@ -8,5 +8,6 @@ aiohttp==3.10.10
 beautifulsoup4==4.12.3
 duckduckgo_search==6.3.4
 nest_asyncio==1.6.0
-g4f==0.3.3.4
+pdfminer.six==20240706
+g4f==0.3.8.1
 g4f[all]
