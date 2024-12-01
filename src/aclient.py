@@ -166,8 +166,9 @@ class DiscordClient(discord.Client):
         except Exception as e:
             logger.exception(f"get_website_info: Не удалось получить информацию с сайта {url}: {e}")
             return None, f"Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите {os.environ.get('ADMIN_NAME')} если ошибка повторяется несколько раз."
-        async def enqueue_message(self, message, user_message, request_type):
-            await self.message_queue.put((message, user_message, request_type))
+
+    async def enqueue_message(self, message, user_message, request_type):
+        await self.message_queue.put((message, user_message, request_type))
 
     async def send_message(self, message, user_message, request_type):
         user_id = message.user.id
