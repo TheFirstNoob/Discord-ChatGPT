@@ -2,168 +2,167 @@
     {
         "model": "gpt-3.5-turbo",
         "provider": "DarkAI",
-        "response": "Hello there! It's my pleasure to meet you. So what's new in your world today? I'm excited to reconnect and share some electrifying ideas with you. Let's get that creative energy flowing!",
-        "response_time": 3.9986674785614014
+        "response": "Greetings and welcome! Let's dive into an adventurous world filled with interesting thoughts and ideas. Don't hold back, let's explore together! We're about to embark on a wild journey bound by no rules, expectations or boundaries – just pure, unfiltered creativity.",
+        "response_time": 3.201500415802002
     },
     {
         "model": "gpt-4",
         "provider": "Mhystical",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.0447583198547363
+        "response_time": 1.3129193782806396
     },
     {
         "model": "gpt-4o-mini",
         "provider": "Airforce",
-        "response": "Assistant: Hello! How can I assist you today?",
-        "response_time": 3.475864887237549
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.7798089981079102
     },
     {
         "model": "gpt-4o-mini",
         "provider": "ChatGptEs",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.239415168762207
+        "response_time": 3.4855310916900635
     },
     {
         "model": "gpt-4o-mini",
         "provider": "DDG",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.1241917610168457
+        "response_time": 1.0174119472503662
     },
     {
         "model": "gpt-4o",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.979227781295776
+        "response_time": 0.935023307800293
     },
     {
         "model": "gpt-4o",
         "provider": "ChatGptEs",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.1338310241699219
+        "response_time": 1.1637659072875977
     },
     {
         "model": "gpt-4o",
         "provider": "Airforce",
-        "response": "Hello! I'm happy to assist you. How can I help you today?",
-        "response_time": 2.1476129387457313},
+        "response": "Hello! How can I assist you today?",
+        "response_time": 6.941869497299194
+    },
     {
         "model": "gpt-4o",
         "provider": "DarkAI",
-        "response": "Hi there! Before we begin, can you tell me a bit more about the specific issue you're struggling with so we can focus our conversation and work towards finding solutions together?",
-        "response_time": 2.6295692920684814
+        "response": "Hello! How can I assist you today? I'm here to help you understand and address the issues you're struggling with. What specific issue are you currently facing?",
+        "response_time": 2.1851327419281006
+    },
+    {
+        "model": "o1-mini",
+        "provider": "Airforce",
+        "response": "Hello! 😊 How can I help you today?",
+        "response_time": 31.930177450180054
     },
     {
         "model": "claude-3-haiku",
         "provider": "DDG",
         "response": "Hello! I'm happy to assist you. How can I help you today?",
-        "response_time": 1.1902053356170654
+        "response_time": 1.1646232604980469
     },
     {
         "model": "claude-3.5-sonnet",
         "provider": "Blackbox",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 2.365211009979248
+        "response": "Hi there! How are you doing today? Is there anything I can help you with?",
+        "response_time": 1.2087929248809814
     },
     {
-        "model": "blackbox",
+        "model": "blackboxai",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 2.2740254402160645
+        "response_time": 0.8370487689971924
     },
     {
-        "model": "blackbox-pro",
+        "model": "blackboxai-pro",
         "provider": "Blackbox",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 5.426831245422363
+        "error": "Пустой ответ."
     },
     {
         "model": "gemini-flash",
         "provider": "Blackbox",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 2.337092399597168
+        "response": "Hello! 👋  What can I do for you today? 😊",
+        "response_time": 0.8568909168243408
     },
     {
         "model": "gemini-flash",
         "provider": "GizAI",
-        "response": "Hello there! How can I help you today?",
-        "response_time": 0.8881042003631592
+        "response": "Hello! How can I assist you today?",
+        "response_time": 3.056766986846924
     },
     {
         "model": "gemini-pro",
         "provider": "Blackbox",
         "response": "Hello! 👋  What can I do for you today? 😊",
-        "response_time": 0.9234516620635986
+        "response_time": 1.1490108966827393
     },
     {
         "model": "llama-3.1-70b",
         "provider": "Blackbox",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 2.207426071166992
+        "response": "**Hello! How can I assist you today?** \n\n- If you have a question or need information, feel free to ask!\n- I'm here to help with various topics, including programming, general knowledge, and more. \n\nLet me know what you need!",
+        "response_time": 1.2171857357025146
     },
     {
         "model": "llama-3.1-70b",
         "provider": "TeachAnything",
         "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?",
-        "response_time": 0.9755842685699463
+        "response_time": 1.0338053703308105
     },
     {
         "model": "llama-3.1-70b",
         "provider": "Free2GPT",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 4.472269535064697
+        "response": "Hello there! How can I help you today?\n",
+        "response_time": 4.050432205200195
     },
     {
         "model": "llama-3.1-70b",
         "provider": "Airforce",
-        "response": "Hello! How are you today?",
-        "response_time": 0.9654343128204346
+        "error": "Response 500: HTML content"
     },
     {
         "model": "llama-3.1-70b",
         "provider": "DDG",
         "response": "Hello. How can I assist you today?",
-        "response_time": 1.114314317703247
+        "response_time": 2.0268168449401855
     },
     {
         "model": "llama-3.1-70b",
         "provider": "DarkAI",
-        "response": "Hello! How can I help you today? Please feel free to ask any question or request any information. I'll provide you with relevant and accurate information to the best of my capabilities.",
-        "response_time": 3.3910698890686035
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.7641775608062744
     },
     {
         "model": "llama-3.1-405b",
         "provider": "Blackbox",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 2.2068114280700684
+        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?",
+        "response_time": 1.71181058883667
     },
     {
-        "model": "llama-3.1-405b",
-        "provider": "DarkAI",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 1.8772540092468262
+        "model": "llama-3.3-70b",
+        "provider": "Blackbox",
+        "response": "Hello. It's nice to meet you. Is there something I can help you with or would you like to chat?",
+        "response_time": 1.8564624786376953
     },
     {
-        "model": "sonar-chat",
-        "provider": "PerplexityLabs",
-        "response": "Hello How can I assist you today?",
-        "response_time": 4.50150203704834
+        "model": "qwq-32b",
+        "provider": "Blackbox",
+        "response": "Hi there! How can I assist you today?",
+        "response_time": 0.9118859767913818
     },
     {
-        "model": "lfm-40b",
-        "provider": "PerplexityLabs",
-        "response": "Hello! I'm here to assist you with any questions or tasks you have. Just let me know how I can help.",
-        "response_time": 2.480778455734253
+        "model": "deepseek-chat",
+        "provider": "Blackbox",
+        "response": "Hello! How can I help you today?",
+        "response_time": 0.906592845916748
     },
     {
         "model": "mixtral-8x7b",
         "provider": "DDG",
         "response": " Hello! How can I assist you today? Please keep in mind that our conversation is completely anonymous and no personal information is being recorded. If you have any questions or need help with programming, scripting, or configuration files, feel free to ask!",
-        "response_time": 1.410560131072998
-    },
-    {
-        "model": "llava-13b",
-        "provider": "ReplicateHome",
-        "response": "Hello! How can I help you today?",
-        "response_time": 6.281851291656494
+        "response_time": 1.5162038803100586
     }
 ]

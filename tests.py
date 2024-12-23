@@ -1,8 +1,4 @@
-from __future__ import annotations
-
 import asyncio
-import sys
-import unittest
 import json
 import logging
 import time
@@ -36,46 +32,44 @@ logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
 # Настройки
-CONFIG = {
-    "timeout": 60,  # Время ожидания ответа провайдера (В секундах)
-    "parallel_execution": False  # Установите: True для параллельной работы, False для последовательной
-}
+timeout = 60  # Время ожидания ответа провайдера (В секундах)
+parallel_execution = False  # Установите: True для параллельной работы (быстрее, но Нестабильно!), False для последовательной (Рекомендуемо!)
 
-class AITests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
+class ProviderChecker:
+    def __init__(self):
         self.providers = {}
+        self.results = []
+
+    async def initialize_providers(self):
         models = _initialize_providers()
         for model in models:
             self.providers[model] = RetryProvider(models[model])
 
-        self.results = []
-
-    async def test_provider_availability(self):
-        sys.tracebacklimit = 0
-
-        if CONFIG["parallel_execution"]:
-            await self.test_provider_availability_parallel()
-        else:
-            await self.test_provider_availability_sequential()
-            
-        self.save_results_to_file("results.json")
-
-    async def test_provider_availability_parallel(self):
-        tasks = []
-        for model, provider in self.iterate_providers():
-            task = asyncio.create_task(self.check_provider(model, provider))
-            tasks.append(task)
-
-        await asyncio.gather(*tasks)
-
-    async def test_provider_availability_sequential(self):
-        for model, provider in self.iterate_providers():
-            await self.check_provider(model, provider)
-
-    def iterate_providers(self):
+    async def iterate_providers(self):
         for model in self.providers:
             for provider in self.providers[model].providers:
                 yield model, provider
+
+    async def check_provider_availability(self):
+        if parallel_execution:
+            await self.check_provider_availability_parallel()
+        else:
+            await self.check_provider_availability_sequential()
+        
+        self.save_results_to_file("results.json")
+
+    async def check_provider_availability_parallel(self):
+        tasks = []
+        async for model, provider in self.iterate_providers():
+            task = asyncio.create_task(self.check_provider(model, provider))
+            tasks.append(task)
+            await asyncio.sleep(0.5) # Должно работать лучше с ним!
+
+        await asyncio.gather(*tasks)
+
+    async def check_provider_availability_sequential(self):
+        async for model, provider in self.iterate_providers():
+            await self.check_provider(model, provider)
 
     async def check_provider(self, model, provider):
         provider_name = provider.__name__
@@ -89,7 +83,7 @@ class AITests(unittest.IsolatedAsyncioTestCase):
                     messages=[{"role": "user", "content": "Hello!"}],
                     provider=provider
                 ),
-                timeout=CONFIG["timeout"]
+                timeout=timeout
             )
             elapsed_time = time.time() - start_time
             res = response.choices[0].message.content
@@ -133,5 +127,10 @@ class AITests(unittest.IsolatedAsyncioTestCase):
         except IOError as e:
             logger.error(f"[-] Ошибка сохранения результата: {filename}: {str(e)}")
 
+async def main():
+    checker = ProviderChecker()
+    await checker.initialize_providers()
+    await checker.check_provider_availability()
+
 if __name__ == '__main__':
-    unittest.main()
+    asyncio.run(main())

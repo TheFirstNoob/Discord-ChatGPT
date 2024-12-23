@@ -4,6 +4,7 @@ import discord
 import asyncio
 import aiofiles
 import aiohttp
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from src.log import logger
 from utils.message_utils import send_split_message
@@ -12,7 +13,7 @@ from duckduckgo_search import AsyncDDGS
 from bs4 import BeautifulSoup
 import g4f.debug
 from g4f.client import AsyncClient
-from g4f.stubs import ChatCompletion
+from g4f.client.stubs import ChatCompletion     # Updated with G4F: Thx Kqlio67 for note this
 from g4f.Provider import (
     AIUncensored,
     Airforce,
@@ -22,7 +23,6 @@ from g4f.Provider import (
     DarkAI,
     Free2GPT,
     GizAI,
-    PerplexityLabs,
     TeachAnything,
     Mhystical,
     ReplicateHome,
@@ -38,8 +38,26 @@ user_data_cache = {}
 
 SYSTEM_DATA_FILE = 'system.json'
 USER_DATA_DIR = 'user_data'
+REMINDERS_DIR = 'reminders'
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
+if not os.path.exists(REMINDERS_DIR):
+    os.makedirs(REMINDERS_DIR)
+    
+async def get_reminders_filepath(user_id):
+    return os.path.join(REMINDERS_DIR, f'{user_id}_reminders.json')
+
+async def load_reminders(user_id):
+    filepath = await get_reminders_filepath(user_id)
+    if os.path.exists(filepath):
+        async with aiofiles.open(filepath, 'r', encoding='utf-8') as file:
+            return json.loads(await file.read())
+    return []
+
+async def save_reminders(user_id, reminders):
+    filepath = await get_reminders_filepath(user_id)
+    async with aiofiles.open(filepath, 'w', encoding='utf-8') as file:
+        await file.write(json.dumps(reminders, ensure_ascii=False, indent=4))
 
 class RetryProvider:
     def __init__(self, providers, shuffle=False):
@@ -64,19 +82,19 @@ def _initialize_providers():
         "gpt-4": [Mhystical],
         "gpt-4o-mini": [Airforce, ChatGptEs, DDG],
         "gpt-4o": [Blackbox, ChatGptEs, Airforce, DarkAI],
+        "o1-mini": [Airforce],
         "claude-3-haiku": [DDG],
         "claude-3.5-sonnet": [Blackbox],
-        "blackbox": [Blackbox],
-        "blackbox-pro": [Blackbox],
+        "blackboxai": [Blackbox],
+        "blackboxai-pro": [Blackbox],
         "gemini-flash": [Blackbox, GizAI],
         "gemini-pro": [Blackbox],
         "llama-3.1-70b": [Blackbox, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
-        "llama-3.1-405b": [Blackbox, DarkAI],
-        "sonar-chat": [PerplexityLabs],
-        "lfm-40b": [PerplexityLabs],
+        "llama-3.1-405b": [Blackbox],
+        "llama-3.3-70b": [Blackbox],
+        "qwq-32b": [Blackbox],
+        "deepseek-chat": [Blackbox],
         "mixtral-8x7b": [DDG],
-
-        "llava-13b": [ReplicateHome], # vision for later
     }
 
 class DiscordClient(discord.Client):
@@ -86,9 +104,10 @@ class DiscordClient(discord.Client):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
         self.providers_dict = _initialize_providers()
-        self.default_model = os.getenv("MODEL", "blackbox")
+        self.default_model = os.getenv("MODEL", "gpt-4o")
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
+        self.reminder_task = None
 
         default_providers = self.providers_dict.get(self.default_model, [])
         self.default_provider = RetryProvider(default_providers, shuffle=False)
@@ -104,6 +123,63 @@ class DiscordClient(discord.Client):
             self.starting_prompt = f.read()
 
         self.message_queue = asyncio.Queue()
+        
+    async def setup_hook(self):
+        if not hasattr(self, 'reminder_task') or self.reminder_task is None:
+            self.reminder_task = asyncio.create_task(self.check_reminders())
+
+    async def check_reminders(self):
+        if hasattr(self, '_reminders_running') and self._reminders_running:
+            return
+        
+        self._reminders_running = True
+        logger.info("Запуск проверки напоминаний...")
+        
+        try:
+            while True:
+                try:
+                    await asyncio.sleep(10)  # Need more test for this...
+                    current_time = datetime.now()
+                    user_ids = os.listdir(REMINDERS_DIR)
+
+                    for user_file in user_ids:
+                        user_id = int(user_file.split('_')[0])
+                        reminders = await load_reminders(user_id)
+
+                        for reminder in reminders[:]:
+                            reminder_time = datetime.fromisoformat(reminder['time'])
+
+                            if (reminder_time.year == current_time.year and
+                                reminder_time.month == current_time.month and
+                                reminder_time.day == current_time.day and
+                                reminder_time.hour == current_time.hour and
+                                reminder_time.minute == current_time.minute):
+                                
+                                try:
+                                    user = await self.fetch_user(user_id)
+                                    if user:
+                                        await user.send(f"> :alarm_clock: **Привет! :wave: Вы просили меня напомнить вас о:** \n {reminder['message']}")
+                                        logger.info(f"check_reminders: Отправлено напоминание пользователю {user_id}: {reminder['message']}")
+                                        reminders.remove(reminder)
+                                except Exception as e:
+                                    logger.error(f"check_reminders: Ошибка при обработке напоминания: {e}")
+
+                            elif reminder_time < current_time:
+                                try:
+                                    user = await self.fetch_user(user_id)
+                                    if user:
+                                        await user.send(f"> :warning: **Извините :persevere: , из-за технических проблем с нашей стороны мы не смогли вовремя напомнить вам о:** \n> {reminder['message']}")
+                                        logger.info(f"check_reminders: Просроченное напоминание для пользователя {user_id}: {reminder['message']}")
+                                        reminders.remove(reminder)
+                                except Exception as e:
+                                    logger.error(f"check_reminders: Ошибка при обработке просроченного напоминания: {e}")
+                        
+                        await save_reminders(user_id, reminders)
+                except Exception as e:
+                    logger.error(f"check_reminders: Ошибка в цикле проверки напоминаний: {e}")
+                    await asyncio.sleep(30) # Wait after error for restore
+        finally:
+            self._reminders_running = False
 
     async def process_messages(self):
         while True:
@@ -225,16 +301,17 @@ class DiscordClient(discord.Client):
         attempts = 0
         max_attempts = len(retry_provider.providers)
         last_error = None
+        current_provider = None
 
         while attempts < max_attempts:
             try:
-                provider = retry_provider.get_next_provider()
-                logger.info(f"handle_response: Текущий провайдер выбран: {provider}")
-                self.chatBot = AsyncClient(provider=provider)
+                current_provider = retry_provider.get_next_provider()
+                logger.info(f"handle_response: Текущий провайдер выбран: {current_provider}")
+                self.chatBot = AsyncClient(provider=current_provider)
                 response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
                 break
             except Exception as e:
-                logger.exception(f"handle_response: Ошибка с провайдером {provider}: {e}")
+                logger.exception(f"handle_response: Ошибка с провайдером {current_provider}: {e}")
                 last_error = e
                 attempts += 1
 
