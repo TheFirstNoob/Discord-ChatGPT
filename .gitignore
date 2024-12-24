@@ -1,10 +1,12 @@
-
 texts/info.txt
-/user_data
-src/__init__.py
-/src/__pycache__
-/utils/__pycache__
-utils/__init__.py
+user_data
+src/__pycache__
+utils/__pycache__
 
 .idea
 __pycache__
+*.log
+venv
+
+har_and_cookies
+generated_images/

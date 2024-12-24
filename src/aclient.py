@@ -13,11 +13,10 @@ from duckduckgo_search import AsyncDDGS
 from bs4 import BeautifulSoup
 import g4f.debug
 from g4f.client import AsyncClient
-from g4f.client.stubs import ChatCompletion     # Updated with G4F: Thx Kqlio67 for note this
 from g4f.Provider import (
-    AIUncensored,
     Airforce,
     Blackbox,
+    BlackboxAgent,
     ChatGptEs,
     DDG,
     DarkAI,
@@ -25,8 +24,9 @@ from g4f.Provider import (
     GizAI,
     TeachAnything,
     Mhystical,
-    ReplicateHome,
-    
+    PollinationsAI,
+    DeepInfraChat,
+
     RetryProvider
 )
 
@@ -81,20 +81,21 @@ def _initialize_providers():
         "gpt-3.5-turbo": [DarkAI],
         "gpt-4": [Mhystical],
         "gpt-4o-mini": [Airforce, ChatGptEs, DDG],
-        "gpt-4o": [Blackbox, ChatGptEs, Airforce, DarkAI],
+        "gpt-4o": [Blackbox, PollinationsAI, ChatGptEs, Airforce, DarkAI],
         "o1-mini": [Airforce],
         "claude-3-haiku": [DDG],
-        "claude-3.5-sonnet": [Blackbox],
+        "claude-3.5-sonnet": [Blackbox, PollinationsAI],
         "blackboxai": [Blackbox],
         "blackboxai-pro": [Blackbox],
         "gemini-flash": [Blackbox, GizAI],
         "gemini-pro": [Blackbox],
-        "llama-3.1-70b": [Blackbox, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
+        "llama-3.1-70b": [Blackbox, BlackboxAgent, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
-        "llama-3.3-70b": [Blackbox],
-        "qwq-32b": [Blackbox],
+        "llama-3.3-70b": [Blackbox, DeepInfraChat],
+        "qwq-32b": [Blackbox, DeepInfraChat],
         "deepseek-chat": [Blackbox],
-        "mixtral-8x7b": [DDG],
+        "lfm-40b": [Airforce],
+        "mixtral-8x7b": [DDG]
     }
 
 class DiscordClient(discord.Client):
@@ -201,10 +202,13 @@ class DiscordClient(discord.Client):
             tasks = [self.get_website_info(result.get('href')) for result in results if result.get('href')]
             website_info = await asyncio.gather(*tasks)
             conversation_history = []
-            for title, paragraphs in website_info:
+            
+            # Zip together the results and website_info to keep track of URLs
+            for result, (title, paragraphs) in zip(results, website_info):
                 if title and paragraphs:
                     conversation_history.append(f"Ссылка на ресурс: {result.get('href')}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
             return conversation_history
+            
         elif request_type == 'images':
             logger.info(f"Картинки по запросу: {query}")
             results = await AsyncDDGS().aimages(query, max_results=5)
@@ -257,21 +261,39 @@ class DiscordClient(discord.Client):
             logger.exception(f"send_message: Ошибка при отправке: {e}")
 
     async def send_start_prompt(self):
-        discord_channel_id = os.getenv("DISCORD_CHANNEL_ID")
         try:
-            if self.starting_prompt and discord_channel_id:
-                channel = self.get_channel(int(discord_channel_id))
-                logger.info(f"Отправка системных инструкций для ИИ с размером (байтов): {len(self.starting_prompt)}")
+            discord_channel_id = os.getenv("DISCORD_CHANNEL_ID")
+            
+            if not discord_channel_id:
+                logger.warning("send_start_prompt: DISCORD_CHANNEL_ID не установлен в .env файле")
+                return
+                
+            if not self.starting_prompt:
+                logger.warning("send_start_prompt: Системные инструкции не установлены")
+                return
 
-                response = await self.handle_response(None, self.starting_prompt)
+            # Wait for the client to be ready before getting the channel
+            await self.wait_until_ready()
+            
+            channel = self.get_channel(int(discord_channel_id))
+            if channel is None:
+                logger.error(f"send_start_prompt: Не удалось найти канал с ID {discord_channel_id}")
+                return
+
+            logger.info(f"Отправка системных инструкций для ИИ с размером (байтов): {len(self.starting_prompt)}")
+
+            response = await self.handle_response(None, self.starting_prompt)
+            if response:
                 await channel.send(f"{response}")
-
                 logger.info("send_start_prompt: Ответ от ИИ получен. Функция отработала корректно!")
             else:
-                logger.info("send_start_prompt: Не установлены системные инструкции или не выбран Discord канал. Пропуск отправки `send_start_prompt` функции.")
+                logger.warning("send_start_prompt: Не получен ответ от ИИ")
+                
+        except ValueError as e:
+            logger.error(f"send_start_prompt: Ошибка при конвертации ID канала: {e}")
         except Exception as e:
             logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
-
+            
     async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
         user_data = await self.load_user_data(user_id)
         conversation_history = user_data.get('history', [])
