@@ -1,14 +1,13 @@
 ## Версия: 4.1.0 Release
 ## Статус: Актуальная :white_check_mark:
-## Дата релиза: 25.12.23
+## Дата релиза: 25.12.24
 
 :rocket: **ОБНОВЛЕНИЕ ФУНКЦИОНАЛА И СТАБИЛЬНОСТИ** :rocket:
 
 ### Добавлено:
         **Новые провайдеры:**
-        1. BlackboxAgent
-        2. PollinationsAI 
-        3. DeepInfraChat
+        1. PollinationsAI 
+        2. DeepInfraChat
 
         **Новые модели:**
         - LLaMa 3.1 70B
