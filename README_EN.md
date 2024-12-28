@@ -14,6 +14,7 @@
 
 1. [⭐️ Features](#%EF%B8%8F-features)
 2. [🆕 Differences from the original version](#-differences-from-the-original-version)
+3. [🚧 TODO List for 2025](#-todo-list-for-2025)
 3. [🛠️ Installation](#%EF%B8%8F-installation)
 4. [🔨 Create your own Discord bot](#-create-your-own-discord-bot)
 5. [🚀 Running the bot on Windows](#-running-the-bot-on-windows)
@@ -42,6 +43,79 @@
 
 ---
 
+## 🚧 TODO List for 2025
+
+<details>
+   <summary>
+   
+   ### Features to Add to the Bot
+
+   </summary>
+   
+- **Mention Support**: Enable users to interact with the bot using mentions (e.g., "@BotName hi") for more personalized responses.
+- **Streaming Message Support**: Implement a Discord edit function for streaming messages, ensuring proper chunk splitting.
+	> - Introduce a `/settings` command for users to customize their parameters.
+	> - Enforce a minimum delay of 1 second between messages to prevent spam.
+- **Vision Model Integration**: Incorporate support for vision models to enhance functionality.
+- **Agent Support**: Add capabilities for agents, similar to Blackbox agents.
+- **Localization**: Localize all code to improve accessibility for users in different regions.
+- **Google Search Integration**: Integrate Google Search Engine support for enhanced information retrieval.
+- **WolframAlpha Integration**: Add support for the WolframAlpha Engine to provide computational knowledge.
+- **DeepL Integration**: Incorporate the DeepL Engine for advanced translation capabilities.
+- **Enhanced Discord UI**: Improve the user interface with features like Ember messages and interactive buttons (e.g., "Regenerate").
+- **Database Integration**: Utilize MySQL/NoSQL or another database to store user messages based on configuration settings.
+- **User  Memory**: Implement permanent memory for each user to save custom instructions and preferences.
+- **New Services and Products**: Explore integration of additional services and products to expand functionality.
+  
+</details>
+
+<details>
+   <summary>
+   
+   ### Improvements for the Bot
+
+   </summary>
+   
+- **Message Splitting Enhancement**: Refine the `utils/message_split` function to ensure accurate code highlighting. After splitting code into chunks, the appropriate language markers (e.g., ```cpp) should be applied.
+
+    > **Example User Prompt**: C++ Snake Game
+    > 
+    > **Bot Response**: 
+   > - **1st Chunk**:  
+   >    ^^^cpp  
+   >          Code for Snake game here, part 1  
+	>    ^^^# End of chunk 1  
+	> 	
+   > - **2nd Chunk**:  
+   >    ^^^ # Missing cpp marking on start of chunk 2!  
+	> 		   Code for Snake game here, part 2  
+	>    ^^^  
+		
+- **Streaming Message Optimization**: Further optimize the `utils/message_split` function for improved performance in streaming messages.
+- **Multiple Image Generation**: Support the generation of up to 4 images for `/draw` commands.
+- **Enhanced Web Search**: Improve web search capabilities for images and videos. Transform user messages to enhance search accuracy and implement language detection for optimal results.
+		
+   > **Example User Request**: "I want to learn basic C++" (with request_type = videos)
+	> 	
+   > - **Current Implementation**:
+	> 		- Sends YouTube video with: "I want to learn basic C++"
+	> 		- Provides incorrect links.
+	> 	
+   > - **Desired Implementation**:
+	> 		- Transform user message for accurate search.
+	> 		- Send YouTube video after conversion: "C++ beginners" (or "C++ basics").
+	> 		- Provide correct links to the user.
+
+- **Code Optimization**: Reorganize and optimize the codebase for better performance and maintainability.
+- **Security and Stability Enhancements**: Strengthen security measures and improve overall stability.
+- **README Enhancement**: Improve the clarity and comprehensiveness of the README documentation.
+- **Documentation for Code**: Add detailed documentation for all code components to facilitate understanding and usage.
+- **Log Improvements**: Enhance logging mechanisms for better tracking and debugging.
+
+</details>
+
+---
+
 ## 🛠️ Installation
 
 * **Python 3.9 or later**
@@ -52,7 +126,10 @@
 
 ## 🔨 Create your own Discord bot
 
-**Download the bot:** [TheFirstNoob/Discord-ChatGPT](https://github.com/TheFirstNoob/Discord-ChatGPT/archive/refs/heads/main.zip)
+**Download bot:** [Latest Release](https://github.com/TheFirstNoob/Discord-ChatGPT/releases)  
+> [!WARNING]
+> **Please use ONLY the release versions!**  
+> Main versions may not be fully functional due to ongoing plans, tests, and other developments.  
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create an application.
 2. Go to the **Bot** section, get the Token, and insert it into `.env` in the line: `DISCORD_BOT_TOKEN`.
