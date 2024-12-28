@@ -16,7 +16,6 @@ from g4f.client import AsyncClient
 from g4f.Provider import (
     Airforce,
     Blackbox,
-    BlackboxAgent,
     ChatGptEs,
     DDG,
     DarkAI,
@@ -89,7 +88,7 @@ def _initialize_providers():
         "blackboxai-pro": [Blackbox],
         "gemini-flash": [Blackbox, GizAI],
         "gemini-pro": [Blackbox],
-        "llama-3.1-70b": [Blackbox, BlackboxAgent, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
+        "llama-3.1-70b": [Blackbox, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
         "llama-3.3-70b": [Blackbox, DeepInfraChat],
         "qwq-32b": [Blackbox, DeepInfraChat],

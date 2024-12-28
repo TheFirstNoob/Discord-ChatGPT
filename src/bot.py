@@ -197,6 +197,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="4.1.0", value="4.1.0"),
         app_commands.Choice(name="4.0.0", value="4.0.0"),
         app_commands.Choice(name="3.5.1", value="3.5.1"),
         app_commands.Choice(name="3.5.0", value="3.5.0"),
