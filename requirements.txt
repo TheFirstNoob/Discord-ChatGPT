@@ -6,4 +6,4 @@ aiofiles==24.1.0
 beautifulsoup4==4.12.3
 duckduckgo-search==6.4.2
 pdfminer.six==20240706
-g4f==0.3.9.8
+g4f==0.4.0.0
