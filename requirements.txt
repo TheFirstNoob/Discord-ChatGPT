@@ -2,12 +2,8 @@ discord.py==2.4.0
 audioop-lts; python_version>='3.13'
 python-dotenv==1.0.1
 asgiref==3.8.1
-selenium==4.27.1
 aiofiles==24.1.0
-aiohttp==3.11.10
 beautifulsoup4==4.12.3
-duckduckgo_search==6.4.1
-nest_asyncio==1.6.0
+duckduckgo-search==6.4.2
 pdfminer.six==20240706
-g4f==0.3.9.7
-g4f[all]
+g4f==0.4.0.6
