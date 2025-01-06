@@ -6,12 +6,13 @@ import discord
 import aiohttp
 import mimetypes
 from datetime import datetime, timedelta
-from src.log import logger
 from typing import Optional
 from pdfminer.high_level import extract_text
 from g4f.client import AsyncClient
+from src.log import logger
 from src.aclient import discordClient
 from src.aclient import load_reminders, save_reminders
+from src.ban_manager import ban_manager
 from discord import app_commands, Attachment
 from g4f.Provider import Prodia
 
@@ -36,7 +37,12 @@ async def run_discord_bot():
         app_commands.Choice(name="Изображение", value="images"),
         app_commands.Choice(name="Видео", value="videos")
     ])
-    async def ask(interaction: discord.Interaction, *, message: str, request_type: Optional[str] = None):
+    async def ask(
+        interaction: discord.Interaction,
+        *,
+        message: str,
+        request_type: Optional[str] = None
+    ):
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
@@ -63,7 +69,12 @@ async def run_discord_bot():
         app_commands.Choice(name="Изображение", value="images"),
         app_commands.Choice(name="Видео", value="videos")
     ])
-    async def asklong(interaction: discord.Interaction, message: str, file: Attachment, request_type: Optional[str] = None):
+    async def asklong(
+        interaction: discord.Interaction,
+        message: str,
+        file: Attachment,
+        request_type: Optional[str] = None
+    ):
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
@@ -94,7 +105,11 @@ async def run_discord_bot():
         message="Введите ваш запрос к ИИ",
         file="Загрузите PDF-файл для извлечения текста"
     )
-    async def askpdf(interaction: discord.Interaction, message: str, file: Attachment):
+    async def askpdf(
+        interaction: discord.Interaction,
+        message: str,
+        file: Attachment
+    ):
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
@@ -132,7 +147,6 @@ async def run_discord_bot():
         app_commands.Choice(name="GPT 4 (OpenAI)", value="gpt-4"),
         app_commands.Choice(name="GPT 4o-Mini (OpenAI)", value="gpt-4o-mini"),
         app_commands.Choice(name="GPT 4o (OpenAI)", value="gpt-4o"),
-        app_commands.Choice(name="o1 Mini (OpenAI)", value="o1-mini"),
         app_commands.Choice(name="Claude 3 Haiku (Anthropic)", value="claude-3-haiku"),
         app_commands.Choice(name="Claude 3.5 Sonnet (Anthropic)", value="claude-3.5-sonnet"),
         app_commands.Choice(name="Blackbox (Blackbox AI)", value="blackboxai"),
@@ -147,7 +161,10 @@ async def run_discord_bot():
         app_commands.Choice(name="Mixtral-8x7B (Mistral)", value="mixtral-8x7b"),
         app_commands.Choice(name="LFM 40B (Liquid)", value="lfm-40b"),
     ])
-    async def chat_model(interaction: discord.Interaction, model: app_commands.Choice[str]):
+    async def chat_model(
+        interaction: discord.Interaction,
+        model: app_commands.Choice[str]
+    ):
         await interaction.response.defer(ephemeral=True)
 
         user_id = interaction.user.id
@@ -160,7 +177,9 @@ async def run_discord_bot():
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
 
     @discordClient.tree.command(name="reset", description="Сброс истории запросов")
-    async def reset(interaction: discord.Interaction):
+    async def reset(
+        interaction: discord.Interaction
+    ):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         await discordClient.reset_conversation_history(user_id)
@@ -168,7 +187,9 @@ async def run_discord_bot():
         logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю.\x1b[0m")
 
     @discordClient.tree.command(name="help", description="Информация как пользоваться ботом")
-    async def help_command(interaction: discord.Interaction):
+    async def help_command(
+        interaction: discord.Interaction
+    ):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         help_file_path = 'texts/help.txt'
@@ -182,7 +203,9 @@ async def run_discord_bot():
         logger.info(f"\x1b[31m{username} использовал(а) команду help!\x1b[0m")
 
     @discordClient.tree.command(name="about", description="Информация о боте")
-    async def about_command(interaction: discord.Interaction):
+    async def about_command(
+        interaction: discord.Interaction
+    ):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         about_file_path = 'texts/about.txt'
@@ -218,7 +241,10 @@ async def run_discord_bot():
         app_commands.Choice(name="2.1.0", value="2.1.0"),
         app_commands.Choice(name="2.0.0", value="2.0.0"),
     ])
-    async def changelog(interaction: discord.Interaction, version: app_commands.Choice[str]):
+    async def changelog(
+        interaction: discord.Interaction,
+        version: app_commands.Choice[str]
+    ):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         version_file = f"texts/change_log/{version.value}.txt"
@@ -235,7 +261,9 @@ async def run_discord_bot():
         logger.info(f"\x1b[31m{username} запросил(а) журнал изменений для версии {version.name} бота\x1b[0m")
         
     @discordClient.tree.command(name="history", description="Получить историю сообщений")
-    async def history(interaction: discord.Interaction):
+    async def history(
+        interaction: discord.Interaction
+    ):
         await interaction.response.defer(ephemeral=False)
         username = str(interaction.user)
 
@@ -274,7 +302,11 @@ async def run_discord_bot():
         app_commands.Choice(name="Dall-E V3", value="dall-e-3"),
         app_commands.Choice(name="Any Dark", value="any-dark"),
     ])
-    async def draw(interaction: discord.Interaction, prompt: str, image_model: app_commands.Choice[str]):
+    async def draw(
+        interaction: discord.Interaction,
+        prompt: str,
+        image_model: app_commands.Choice[str]
+    ):
         if interaction.user == discordClient.user:
             return
 
@@ -339,7 +371,11 @@ async def run_discord_bot():
         app_commands.Choice(name="Pastel Mix Stylized Anime", value="pastelMixStylizedAnime_pruned_fp16.safetensors [793a26e8]"),
         app_commands.Choice(name="Realistic Vision V5.1", value="Realistic_Vision_V5.1.safetensors [a0f13c83]"),
     ])
-    async def draw_prodia(interaction: discord.Interaction, prompt: str, image_model: app_commands.Choice[str]):
+    async def draw_prodia(
+        interaction: discord.Interaction,
+        prompt: str,
+        image_model: app_commands.Choice[str]
+    ):
         if interaction.user == discordClient.user:
             return
 
@@ -405,6 +441,11 @@ async def run_discord_bot():
             if reminder_time < datetime.now():
                 await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание на время в прошлом.")
                 return
+                
+            max_future_date = datetime.now() + timedelta(days=365)
+            if reminder_time > max_future_date:
+                await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание больше чем на год.")
+                return
 
             reminders.append({"time": reminder_time.isoformat(), "message": message})
             await save_reminders(user_id, reminders)
@@ -418,7 +459,9 @@ async def run_discord_bot():
             await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
 
     @discordClient.tree.command(name="remind-list", description="Показать все ваши напоминания")
-    async def show_reminders(interaction: discord.Interaction):
+    async def show_reminders(
+        interaction: discord.Interaction
+    ):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         reminders = await load_reminders(user_id)
@@ -433,7 +476,10 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="remind-delete", description="Удалить напоминание")
     @app_commands.describe(index="Индекс напоминания для удаления")
-    async def delete_reminder(interaction: discord.Interaction, index: int):
+    async def delete_reminder(
+        interaction: discord.Interaction,
+        index: int
+    ):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         reminders = await load_reminders(user_id)
@@ -446,6 +492,83 @@ async def run_discord_bot():
         await save_reminders(user_id, reminders)
         await interaction.followup.send(f"> :white_check_mark: **Напоминание удалено!**")
         logger.info(f"\x1b[31m{username} удалил напомнание\x1b[0m")
+        
+    @discordClient.tree.command(name="ban", description="Забанить пользователя")
+    @app_commands.describe(
+        user_id="ID пользователя, которого нужно забанить",
+        reason="Причина бана (необязательно)",
+        days="Количество дней бана (необязательно, по умолчанию - перманентный бан)"
+    )
+    async def ban_user(
+        interaction: discord.Interaction, 
+        user_id: str, 
+        reason: str = "Нарушение правил",
+        days: int = None
+    ):
+        await interaction.response.defer(ephemeral=True)
+        
+        # Проверка прав администратора
+        if interaction.user.id != ban_manager.admin_id:
+            await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
+            return
+
+        # Подготовка длительности (если указана)
+        duration = {'days': days} if days else None
+        
+        success, message = await ban_manager.ban_user(
+            interaction.user.id, 
+            int(user_id), 
+            reason, 
+            duration
+        )
+
+        await interaction.followup.send(message)
+
+    @discordClient.tree.command(name="unban", description="Разбанить пользователя")
+    @app_commands.describe(
+        user_id="ID пользователя, которого нужно разбанить"
+    )
+    async def unban_user(
+        interaction: discord.Interaction, 
+        user_id: str
+    ):
+        await interaction.response.defer(ephemeral=True)
+        
+        # Проверка прав администратора
+        if interaction.user.id != ban_manager.admin_id:
+            await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
+            return
+
+        success, message = await ban_manager.unban_user(
+            interaction.user.id, 
+            int(user_id)
+        )
+
+        await interaction.followup.send(message)
+
+    @discordClient.tree.command(name="banned-list", description="Список забаненных пользователей")
+    async def list_banned_users(
+        interaction: discord.Interaction
+    ):
+        await interaction.response.defer(ephemeral=True)
+        
+        # Проверка прав администратора
+        if interaction.user.id != ban_manager.admin_id:
+            await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
+            return
+
+        banned_users = await ban_manager.get_banned_users(interaction.user.id)
+        
+        if not banned_users:
+            await interaction.followup.send("> :white_check_mark: **Нет забаненных пользователей.**")
+            return
+
+        # Формируем список забаненных
+        banned_list = "\n".join([
+            f"ID: {user['user_id']}, Причина: {user['reason']}" 
+            for user in banned_users
+        ])
+        await interaction.followup.send(f"Забаненные пользователи:\n{banned_list}")
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
     await discordClient.start(TOKEN)

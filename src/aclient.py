@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from src.log import logger
 from utils.message_utils import send_split_message
 from discord import app_commands
-from duckduckgo_search import AsyncDDGS
+from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 import g4f.debug
 from g4f.client import AsyncClient
@@ -79,14 +79,13 @@ def _initialize_providers():
         # Chat providers
         "gpt-3.5-turbo": [DarkAI],
         "gpt-4": [Mhystical],
-        "gpt-4o-mini": [Airforce, ChatGptEs, DDG],
-        "gpt-4o": [Blackbox, PollinationsAI, ChatGptEs, Airforce, DarkAI],
-        "o1-mini": [Airforce],
+        "gpt-4o-mini": [ChatGptEs, DDG],
+        "gpt-4o": [Blackbox, PollinationsAI, ChatGptEs, DarkAI],
         "claude-3-haiku": [DDG],
         "claude-3.5-sonnet": [Blackbox, PollinationsAI],
         "blackboxai": [Blackbox],
         "blackboxai-pro": [Blackbox],
-        "gemini-flash": [Blackbox, GizAI],
+        "gemini-flash": [GizAI],
         "gemini-pro": [Blackbox],
         "llama-3.1-70b": [Blackbox, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
@@ -194,57 +193,90 @@ class DiscordClient(discord.Client):
                     await asyncio.gather(*tasks)
             await asyncio.sleep(1)
             
-    async def process_request(self, query, request_type="search", max_results=3):
-        if request_type == 'search':
-            logger.info(f"Поиск по запросу: {query}")
-            results = await AsyncDDGS().atext(query, max_results=max_results)
-            tasks = [self.get_website_info(result.get('href')) for result in results if result.get('href')]
-            website_info = await asyncio.gather(*tasks)
-            conversation_history = []
+    async def process_request(self, query, request_type="search"):
+        try:
+            if request_type == 'search':
+                logger.info(f"Поиск по запросу: {query}")
+                results = DDGS().text(query, max_results=3, region="wt-wt", safesearch="moderate", backend="auto")
+                tasks = [self.get_website_info(result.get('href')) for result in results if result.get('href')]
+                website_info = await asyncio.gather(*tasks)
+                conversation_history = []
+                
+                for result, (title, paragraphs) in zip(results, website_info):
+                    if title and paragraphs:
+                        conversation_history.append(f"Ссылка на ресурс: {result.get('href', 'Ссылка не указана')}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
+                
+                return conversation_history or [f"По запросу '{query}' ничего не найдено."]
+                
+            elif request_type == 'images':
+                logger.info(f"Картинки по запросу: {query}")
+                results = DDGS().images(query, max_results=5, region="wt-wt", safesearch="moderate")
+                image_links = [result['image'] for result in results if result.get('image')]
+                
+                return image_links or [f"Не удалось найти картинки по запросу '{query}'."]
             
-            # Zip together the results and website_info to keep track of URLs
-            for result, (title, paragraphs) in zip(results, website_info):
-                if title and paragraphs:
-                    conversation_history.append(f"Ссылка на ресурс: {result.get('href')}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
-            return conversation_history
-            
-        elif request_type == 'images':
-            logger.info(f"Картинки по запросу: {query}")
-            results = await AsyncDDGS().aimages(query, max_results=5)
-            image_links = [result['image'] for result in results if result.get('image')]
-            if not image_links:
-                return [f"Не удалось найти картинки по запросу '{query}'."]
-            return [
-                f"Картинки по запросу '{query}':\n" +
-                "\n".join(image_links)
-            ]
-        elif request_type == 'videos':
-            logger.info(f"Поиск видео по запросу: {query}")
-            results = await AsyncDDGS().avideos(query, max_results=5)
-            media_links = [result['content'] for result in results if result.get('content')]
-            if not media_links:
-                return [f"Не удалось найти видео по запросу '{query}'."]
-            return [
-                f"Видео по запросу '{query}':\n" +
-                "\n".join(media_links)
-            ]
+            elif request_type == 'videos':
+                logger.info(f"Поиск видео по запросу: {query}")
+                results = DDGS().videos(query, max_results=5, region="wt-wt", safesearch="moderate")
+                media_links = [result['content'] for result in results if result.get('content')]
+                
+                return media_links or [f"Не удалось найти видео по запросу '{query}'."]
+        
+        except Exception as e:
+            logger.error(f"Ошибка в process_request: {e}")
+            return [f"Произошла ошибка при поиске: {e}"]
 
     async def get_website_info(self, url):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    html = await response.text()
-                    soup = BeautifulSoup(html, 'html.parser')
-                    title = soup.title.text if soup.title else "Без названия"
-                    paragraphs = [p.text for p in soup.find_all('p')]
-                    return title, '\n'.join(paragraphs)
-        except aiohttp.ClientError as e:
-            logger.error(f"get_website_info: Ошибка сети при получении информации с {url}: {e}")
-            return None, "Ошибка сети. Пожалуйста, попробуйте позже."
+                try:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                        response.raise_for_status()
+                        
+                        # Ограничиваем размер контента до 500 КБ
+                        content = await response.read()
+                        if len(content) > 500 * 1024:  # 500 КБ
+                            return None, "Слишком большой объем контента для обработки."
+                        
+                        html = content.decode('utf-8', errors='ignore')
+                        soup = BeautifulSoup(html, 'html.parser')
+                        
+                        # Удаляем скрипты и стили
+                        for script in soup(["script", "style"]):
+                            script.decompose()
+                        
+                        title = soup.title.text if soup.title else "Без названия"
+                        
+                        # Берем первые 5 параграфов или первые 1000 символов
+                        paragraphs = soup.find_all('p')
+                        processed_paragraphs = []
+                        total_chars = 0
+                        
+                        for p in paragraphs:
+                            if total_chars > 1000:
+                                break
+                            
+                            text = p.get_text(strip=True)
+                            if text and len(text) > 30:  # Пропускаем слишком короткие параграфы
+                                processed_paragraphs.append(text)
+                                total_chars += len(text)
+                            
+                            if len(processed_paragraphs) >= 5:
+                                break
+                        
+                        return title, '\n'.join(processed_paragraphs)
+                
+                except aiohttp.ClientTimeout:
+                    logger.error(f"get_website_info: Превышено время ожидания для {url}")
+                    return None, "Время загрузки сайта истекло. Попробуйте позже."
+                
+                except aiohttp.ClientError as e:
+                    logger.error(f"get_website_info: Ошибка сети при получении информации с {url}: {e}")
+                    return None, f"Не удалось загрузить сайт. Возможно, он недоступен. Ошибка: {e}"
+        
         except Exception as e:
             logger.exception(f"get_website_info: Не удалось получить информацию с сайта {url}: {e}")
-            return None, f"Мне не удалось найти информацию на сайте из-за ошибки. Попробуйте еще раз позже или сообщите {os.environ.get('ADMIN_NAME')} если ошибка повторяется несколько раз."
+            return None, f"Произошла неизвестная ошибка при обработке сайта. Попробуйте еще раз."
 
     async def enqueue_message(self, message, user_message, request_type):
         await self.message_queue.put((message, user_message, request_type))
@@ -257,7 +289,16 @@ class DiscordClient(discord.Client):
             response_content = f'\n{response}'
             await send_split_message(self, response_content, message)
         except Exception as e:
-            logger.exception(f"send_message: Ошибка при отправке: {e}")
+            error_message = (
+                f"> :x: **ОШИБКА В ОБРАБОТКЕ ЗАПРОСА:** \n"
+                f"```\n{str(e)}\n```\n"
+                "> Пожалуйста, попробуйте еще раз или сообщите администратору."
+            )
+            logger.exception(f"send_message: Полная ошибка при отправке: {e}")
+            try:
+                await send_split_message(self, error_message, message)
+            except Exception as send_error:
+                logger.error(f"send_message: Критическая ошибка при попытке отправить сообщения с ошибкой: {send_error}")
 
     async def send_start_prompt(self):
         try:
@@ -294,59 +335,73 @@ class DiscordClient(discord.Client):
             logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
             
     async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
-        user_data = await self.load_user_data(user_id)
-        conversation_history = user_data.get('history', [])
-        user_model = user_data.get('model', self.default_model)
+        try:
+            user_data = await self.load_user_data(user_id)
+            conversation_history = user_data.get('history', [])
+            user_model = user_data.get('model', self.default_model)
 
-        conversation_history.append({'role': 'user', 'content': user_message})
+            conversation_history.append({'role': 'user', 'content': user_message})
 
-        if len(conversation_history) > self.max_history_length:
-            conversation_history = conversation_history[3:]
+            if len(conversation_history) > self.max_history_length:
+                conversation_history = conversation_history[3:]
 
-        if request_type:
-            search_results = await self.process_request(user_message, request_type=request_type, max_results=3)
-            for result in search_results:
-                instruction = (
-                    "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. "
-                    "ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ ПОЛЬЗОВАТЕЛЮ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, "
-                    "И ОБЯЗАТЕЛЬНО УКАЖИ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА, "
-                    "ТО СООБЩИ ПОЛЬЗОВАТЕЛЮ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ. "
-                    "ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ КАРТИНКИ ИЛИ ВИДЕО, ТО ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА!]: "
-                    f"Результат поиска: {result}"
-                )
-                conversation_history.append({'role': 'assistant', 'content': instruction})
+            if request_type:
+                try:
+                    search_results = await self.process_request(user_message, request_type=request_type)
+                    for result in search_results:
+                        instruction = (
+                            "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. "
+                            "ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ ПОЛЬЗОВАТЕЛЮ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, "
+                            "И ОБЯЗАТЕЛЬНО УКАЖИ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА, "
+                            "ТО СООБЩИ ПОЛЬЗОВАТЕЛЮ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ. "
+                            "ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ КАРТИНКИ ИЛИ ВИДЕО, ТО ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА!]: "
+                            f"Результат поиска: {result}"
+                        )
+                        conversation_history.append({'role': 'assistant', 'content': instruction})
+                except Exception as search_error:
+                    logger.error(f"Ошибка при поиске: {search_error}")
+                    conversation_history.append({
+                        'role': 'system', 
+                        'content': f"ОШИБКА ПРИ ПОИСКЕ: {str(search_error)}"
+                    })
 
-        retry_provider = await self.get_provider_for_model(user_model)
-        retry_provider.reset()
+            retry_provider = await self.get_provider_for_model(user_model)
+            retry_provider.reset()
+            
+            attempts = 0
+            max_attempts = len(retry_provider.providers)
+            last_error = None
+            current_provider = None
+
+            while attempts < max_attempts:
+                try:
+                    current_provider = retry_provider.get_next_provider()
+                    logger.info(f"handle_response: Текущий провайдер выбран: {current_provider}")
+                    self.chatBot = AsyncClient(provider=current_provider)
+                    response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
+                    break
+                except Exception as e:
+                    logger.exception(f"handle_response: Ошибка с провайдером {current_provider}: {e}")
+                    last_error = e
+                    attempts += 1
+
+            if attempts == max_attempts:
+                return (":x: **ОШИБКА:** К сожалению, все провайдеры для этой модели недоступны. "
+                        "Пожалуйста, попробуйте позже или смените модель.\n\n"
+                        f"**Код ошибки:** ```{last_error}```")
+
+            model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия {os.environ.get('BOT_NAME')}:** *{os.environ.get('VERSION_BOT')}*"
+            bot_response = response.choices[0].message.content
+            conversation_history.append({'role': 'assistant', 'content': bot_response})
+
+            await self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
+            return f"{model_response}\n\n{bot_response}"
         
-        attempts = 0
-        max_attempts = len(retry_provider.providers)
-        last_error = None
-        current_provider = None
-
-        while attempts < max_attempts:
-            try:
-                current_provider = retry_provider.get_next_provider()
-                logger.info(f"handle_response: Текущий провайдер выбран: {current_provider}")
-                self.chatBot = AsyncClient(provider=current_provider)
-                response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
-                break
-            except Exception as e:
-                logger.exception(f"handle_response: Ошибка с провайдером {current_provider}: {e}")
-                last_error = e
-                attempts += 1
-
-        if attempts == max_attempts:
-            return (":x: **ОШИБКА:** К сожалению, все провайдеры для этой модели недоступны. "
-                    "Пожалуйста, попробуйте позже или смените модель.\n\n"
-                    f"**Код ошибки:** ```{last_error}```")
-
-        model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия {os.environ.get('BOT_NAME')}:** *{os.environ.get('VERSION_BOT')}*"
-        bot_response = response.choices[0].message.content
-        conversation_history.append({'role': 'assistant', 'content': bot_response})
-
-        await self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
-        return f"{model_response}\n\n{bot_response}"
+        except Exception as global_error:
+            logger.exception(f"handle_response: Критическая ошибка: {global_error}")
+            return (":x: **КРИТИЧЕСКАЯ ОШИБКА:** Не удалось обработать ваш запрос. "
+                    "Пожалуйста, попробуйте еще раз или сообщите администратору.\n\n"
+                    f"**Детали ошибки:** ```{str(global_error)}```")
         
     async def download_conversation_history(self, user_id: int) -> str:
         filename = SYSTEM_DATA_FILE if user_id is None else f'{user_id}.json'

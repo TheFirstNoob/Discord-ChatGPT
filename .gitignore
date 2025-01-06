@@ -1,5 +1,7 @@
-texts/info.txt
+texts/about.txt
 user_data
+reminders
+bans
 src/__pycache__
 utils/__pycache__
 

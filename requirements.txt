@@ -4,6 +4,6 @@ python-dotenv==1.0.1
 asgiref==3.8.1
 aiofiles==24.1.0
 beautifulsoup4==4.12.3
-duckduckgo-search==6.4.2
+duckduckgo-search==7.2.0
 pdfminer.six==20240706
-g4f==0.4.0.6
+g4f==0.4.0.7
