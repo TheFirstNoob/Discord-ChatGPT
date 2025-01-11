@@ -2,18 +2,27 @@ import os
 import re
 import base64
 import asyncio
-import discord
 import aiohttp
 import mimetypes
+
+import discord
+from discord import app_commands, Attachment
+
 from datetime import datetime, timedelta
 from typing import Optional
 from pdfminer.high_level import extract_text
-from g4f.client import AsyncClient
+
+# local
+from src.locale_manager import locale_manager as lm # For locale later
 from src.log import logger
 from src.aclient import discordClient
-from src.aclient import load_reminders, save_reminders
+from src.aclient import check_ban_and_respond
 from src.ban_manager import ban_manager
-from discord import app_commands, Attachment
+from utils.files_utils import read_file, write_file
+from utils.reminder_utils import load_reminders, save_reminders
+
+# g4f
+from g4f.client import AsyncClient
 from g4f.Provider import Prodia
 
 client = AsyncClient()
@@ -43,6 +52,9 @@ async def run_discord_bot():
         message: str,
         request_type: Optional[str] = None
     ):
+        if await check_ban_and_respond(interaction):
+            return
+    
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
@@ -75,6 +87,9 @@ async def run_discord_bot():
         file: Attachment,
         request_type: Optional[str] = None
     ):
+        if await check_ban_and_respond(interaction):
+            return
+
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
@@ -110,6 +125,9 @@ async def run_discord_bot():
         message: str,
         file: Attachment
     ):
+        if await check_ban_and_respond(interaction):
+            return
+
         await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
@@ -187,34 +205,33 @@ async def run_discord_bot():
         logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю.\x1b[0m")
 
     @discordClient.tree.command(name="help", description="Информация как пользоваться ботом")
-    async def help_command(
-        interaction: discord.Interaction
-    ):
+    async def help_command(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         help_file_path = 'texts/help.txt'
-        if not os.path.exists(help_file_path):
+        
+        help_text = await read_file(help_file_path)
+        if not help_text:
             await interaction.followup.send(f"> :x: **ОШИБКА:** Файл help.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
             logger.error(f"help: Файл справки не найден: {help_file_path}")
             return
-        with open(help_file_path, 'r', encoding='utf-8') as file:
-            help_text = file.read()
+        
         await interaction.followup.send(help_text)
         logger.info(f"\x1b[31m{username} использовал(а) команду help!\x1b[0m")
 
     @discordClient.tree.command(name="about", description="Информация о боте")
-    async def about_command(
-        interaction: discord.Interaction
-    ):
+    async def about_command(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         about_file_path = 'texts/about.txt'
-        if not os.path.exists(about_file_path):
+        
+        about_text = await read_file(about_file_path)
+        if not about_text:
             await interaction.followup.send(f"> :x: **ОШИБКА:** Файл about.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
             logger.error(f"about: Файл информации не найден: {about_file_path}")
             return
-        with open(about_file_path, 'r', encoding='utf-8') as file:
-            about_text = file.read().format(username=username)
+        
+        about_text = about_text.format(username=username)
         await interaction.followup.send(about_text)
         logger.info(f"\x1b[31m{username} использовал(а) команду about!\x1b[0m")
 
@@ -241,21 +258,16 @@ async def run_discord_bot():
         app_commands.Choice(name="2.1.0", value="2.1.0"),
         app_commands.Choice(name="2.0.0", value="2.0.0"),
     ])
-    async def changelog(
-        interaction: discord.Interaction,
-        version: app_commands.Choice[str]
-    ):
+    async def changelog(interaction: discord.Interaction, version: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         version_file = f"texts/change_log/{version.value}.txt"
         
-        if not os.path.exists(version_file):
+        changelog_text = await read_file(version_file)
+        if not changelog_text:
             await interaction.followup.send(f"> :x: **ОШИБКА: Файл журнала изменений для версии {version.name} не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
             logger.error(f"changelog: Файл журнала изменений для версии {version.name} не найден: {version_file}")
             return
-        
-        with open(version_file, 'r', encoding='utf-8') as file:
-            changelog_text = file.read()
         
         await interaction.followup.send(changelog_text)
         logger.info(f"\x1b[31m{username} запросил(а) журнал изменений для версии {version.name} бота\x1b[0m")
@@ -282,6 +294,43 @@ async def run_discord_bot():
             
         logger.info(f"\x1b[31m{username} запросил(а) историю сообщений с ботом\x1b[0m")
     
+    async def generate_and_send_image(
+        interaction: discord.Interaction, 
+        prompt: str, 
+        image_model: str, 
+        model_name: str, 
+        client_type: str = 'default'
+    ):
+        try:
+            await interaction.response.defer()
+
+            if client_type == 'prodia':
+                prodia_client = AsyncClient(image_provider=Prodia)
+                response = await prodia_client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
+            else:
+                response = await client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
+
+            if response.data:
+                base64_text = response.data[0].b64_json
+                image_data = base64.b64decode(base64_text)
+                image_path = f"temp_image_{interaction.user.id}.png"
+
+                with open(image_path, 'wb') as f:
+                    f.write(image_data)
+
+                with open(image_path, 'rb') as f:
+                    model_message = f":paintbrush: **Изображение от модели**: {model_name}"
+                    await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
+
+                os.remove(image_path)
+            else:
+                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение.")
+                logger.error(f"draw: Не удалось сгенерировать изображение. Ответ не содержит данных.")
+
+        except Exception as e:
+            logger.error(f"draw: Ошибка при выполнении команды: {str(e)}")
+            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
+
     @discordClient.tree.command(name="draw", description="Сгенерировать изображение от модели ИИ")
     @app_commands.describe(
         prompt="Введите ваш запрос (На Английском языке)",
@@ -307,6 +356,9 @@ async def run_discord_bot():
         prompt: str,
         image_model: app_commands.Choice[str]
     ):
+        if await check_ban_and_respond(interaction):
+            return
+
         if interaction.user == discordClient.user:
             return
 
@@ -314,31 +366,8 @@ async def run_discord_bot():
         channel = str(interaction.channel)
         logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{image_model.value}]")
 
-        try:
-            await interaction.response.defer()
+        await generate_and_send_image(interaction, prompt, image_model.value, image_model.name)
 
-            response = await client.images.generate(model=image_model.value, prompt=prompt, response_format="b64_json")
-
-            if response.data:
-                base64_text = response.data[0].b64_json
-                image_data = base64.b64decode(base64_text)
-                image_path = f"temp_image_{interaction.user.id}.png"
-
-                with open(image_path, 'wb') as f:
-                    f.write(image_data)
-
-                with open(image_path, 'rb') as f:
-                    model_message = f":paintbrush: **Изображение от модели**: {image_model.name}"
-                    await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
-
-                os.remove(image_path)
-            else:
-                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение.")
-                logger.error("draw: Не удалось сгенерировать изображение. Ответ не содержит данных.")
-        except Exception as e:
-            logger.error(f"draw: Ошибка при выполнении команды: {str(e)}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
-            
     @discordClient.tree.command(name="draw-prodia", description="Сгенерировать изображение от модели ИИ с использованием Prodia")
     @app_commands.describe(
         prompt="Введите ваш запрос (На Английском языке)",
@@ -376,6 +405,9 @@ async def run_discord_bot():
         prompt: str,
         image_model: app_commands.Choice[str]
     ):
+        if await check_ban_and_respond(interaction):
+            return
+
         if interaction.user == discordClient.user:
             return
 
@@ -383,31 +415,13 @@ async def run_discord_bot():
         channel = str(interaction.channel)
         logger.info(f"\x1b[31m{username}\x1b[0m : /draw-prodia [{prompt}] в ({channel}) через [{image_model.name}]")
 
-        try:
-            await interaction.response.defer()
-
-            prodia_client = AsyncClient(image_provider=Prodia)
-            response = await prodia_client.images.generate(model=image_model.value, prompt=prompt, response_format="b64_json")
-
-            if response.data:
-                base64_text = response.data[0].b64_json
-                image_data = base64.b64decode(base64_text)
-                image_path = f"temp_image_{interaction.user.id}.png"
-
-                with open(image_path, 'wb') as f:
-                    f.write(image_data)
-
-                with open(image_path, 'rb') as f:
-                    model_message = f":paintbrush: **Изображение Prodia от модели**: {image_model.name}"
-                    await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
-
-                os.remove(image_path)
-            else:
-                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение.")
-                logger.error("draw-prodia: Не удалось сгенерировать изображение. Ответ не содержит данных.")
-        except Exception as e:
-            logger.error(f"draw-prodia: Ошибка при выполнении команды: {str(e)}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
+        await generate_and_send_image(
+            interaction, 
+            prompt, 
+            image_model.value, 
+            image_model.name, 
+            client_type='prodia'
+        )
 
     @discordClient.tree.command(name="remind-add", description="Создать напоминание")
     @app_commands.describe(
@@ -463,6 +477,7 @@ async def run_discord_bot():
         interaction: discord.Interaction
     ):
         await interaction.response.defer(ephemeral=True)
+        username = str(interaction.user)
         user_id = interaction.user.id
         reminders = await load_reminders(user_id)
 
@@ -501,28 +516,31 @@ async def run_discord_bot():
     )
     async def ban_user(
         interaction: discord.Interaction, 
-        user_id: str, 
+        user_id: str, # it should be int but discord bug?
         reason: str = "Нарушение правил",
         days: int = None
     ):
         await interaction.response.defer(ephemeral=True)
-        
-        # Проверка прав администратора
+
         if interaction.user.id != ban_manager.admin_id:
             await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
             return
 
-        # Подготовка длительности (если указана)
         duration = {'days': days} if days else None
         
-        success, message = await ban_manager.ban_user(
-            interaction.user.id, 
-            int(user_id), 
-            reason, 
-            duration
-        )
-
-        await interaction.followup.send(message)
+        logger.info(f"Попытка бана пользователя {user_id} администратором {interaction.user.id}. Причина: {reason}")
+        
+        try:
+            await ban_manager.ban_user(
+                user_id, 
+                reason, 
+                duration
+            )
+            logger.info(f"Пользователь {user_id} успешно забанен администратором {interaction.user.id}")
+            await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно забанен**")
+        except Exception as e:
+            logger.error(f"Ошибка при бане пользователя {user_id}: {e}")
+            await interaction.followup.send(f"> :x: **Произошла ошибка при бане: {e}**")
 
     @discordClient.tree.command(name="unban", description="Разбанить пользователя")
     @app_commands.describe(
@@ -530,29 +548,33 @@ async def run_discord_bot():
     )
     async def unban_user(
         interaction: discord.Interaction, 
-        user_id: str
+        user_id: str # it should be int but discord bug?
     ):
         await interaction.response.defer(ephemeral=True)
-        
-        # Проверка прав администратора
+
         if interaction.user.id != ban_manager.admin_id:
             await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
             return
 
-        success, message = await ban_manager.unban_user(
-            interaction.user.id, 
-            int(user_id)
-        )
-
-        await interaction.followup.send(message)
+        logger.info(f"Попытка разбана пользователя {user_id} администратором {interaction.user.id}")
+        
+        try:
+            result = await ban_manager.unban_user(int(user_id))
+            if result:
+                logger.info(f"Пользователь {user_id} успешно разбанен администратором {interaction.user.id}")
+                await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно разбанен**")
+            else:
+                await interaction.followup.send(f"> :warning: **Пользователь {user_id} не был забанен**")
+        except Exception as e:
+            logger.error(f"Ошибка при разбане пользователя {user_id}: {e}")
+            await interaction.followup.send(f"> :x: **Произошла ошибка при разбане: {e}**")
 
     @discordClient.tree.command(name="banned-list", description="Список забаненных пользователей")
     async def list_banned_users(
         interaction: discord.Interaction
     ):
         await interaction.response.defer(ephemeral=True)
-        
-        # Проверка прав администратора
+
         if interaction.user.id != ban_manager.admin_id:
             await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
             return
@@ -563,9 +585,8 @@ async def run_discord_bot():
             await interaction.followup.send("> :white_check_mark: **Нет забаненных пользователей.**")
             return
 
-        # Формируем список забаненных
         banned_list = "\n".join([
-            f"ID: {user['user_id']}, Причина: {user['reason']}" 
+            f"**ID:** {user['user_id']}, **Причина:** {user['reason']}" 
             for user in banned_users
         ])
         await interaction.followup.send(f"Забаненные пользователи:\n{banned_list}")

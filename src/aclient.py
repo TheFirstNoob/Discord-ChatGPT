@@ -1,16 +1,15 @@
 import os
 import json
-import discord
 import asyncio
-import aiofiles
-import aiohttp
 from datetime import datetime, timedelta
+from typing import Optional
 from dotenv import load_dotenv
-from src.log import logger
-from utils.message_utils import send_split_message
-from discord import app_commands
-from duckduckgo_search import DDGS
-from bs4 import BeautifulSoup
+
+# discord
+import discord
+from discord import app_commands, Attachment
+
+# g4f
 import g4f.debug
 from g4f.client import AsyncClient
 from g4f.Provider import (
@@ -25,38 +24,45 @@ from g4f.Provider import (
     Mhystical,
     PollinationsAI,
     DeepInfraChat,
-
     RetryProvider
 )
 
-client = AsyncClient()
-load_dotenv()
+# local
+from src.locale_manager import locale_manager as lm  # For locale later
+from src.log import logger
+from src.ban_manager import ban_manager
+from utils.message_utils import send_split_message
+from utils.files_utils import read_json, write_json
+from utils.reminder_utils import check_reminders
+from utils.internet_utils import search_web, get_website_info, prepare_search_results
+from utils.internet_instructions_utils import get_web_search_instruction, get_image_search_instruction, get_video_search_instruction
 
-g4f.debug.logging = os.getenv("G4F_DEBUG", "True")
-user_data_cache = {}
-
+# const
 SYSTEM_DATA_FILE = 'system.json'
 USER_DATA_DIR = 'user_data'
 REMINDERS_DIR = 'reminders'
+
+load_dotenv()
+client = AsyncClient()
+g4f.debug.logging = os.getenv("G4F_DEBUG", "True")
+user_data_cache = {}
+
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 if not os.path.exists(REMINDERS_DIR):
     os.makedirs(REMINDERS_DIR)
-    
-async def get_reminders_filepath(user_id):
-    return os.path.join(REMINDERS_DIR, f'{user_id}_reminders.json')
 
-async def load_reminders(user_id):
-    filepath = await get_reminders_filepath(user_id)
-    if os.path.exists(filepath):
-        async with aiofiles.open(filepath, 'r', encoding='utf-8') as file:
-            return json.loads(await file.read())
-    return []
-
-async def save_reminders(user_id, reminders):
-    filepath = await get_reminders_filepath(user_id)
-    async with aiofiles.open(filepath, 'w', encoding='utf-8') as file:
-        await file.write(json.dumps(reminders, ensure_ascii=False, indent=4))
+async def check_ban_and_respond(interaction):
+    try:
+        is_banned, ban_message = await discordClient.check_user_ban(interaction.user.id)
+        if is_banned:
+            await interaction.response.send_message(ban_message, ephemeral=True)
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"check_ban_and_respond: Ошибка при проверке бана пользователя {interaction.user.id}: {e}")
+        await interaction.response.send_message("> :x: **ОШИБКА:** Не удалось проверить ваш статус бана. Пожалуйста, попробуйте позже.", ephemeral=True)
+        return True
 
 class RetryProvider:
     def __init__(self, providers, shuffle=False):
@@ -125,60 +131,28 @@ class DiscordClient(discord.Client):
         
     async def setup_hook(self):
         if not hasattr(self, 'reminder_task') or self.reminder_task is None:
-            self.reminder_task = asyncio.create_task(self.check_reminders())
+            self.reminder_task = asyncio.create_task(check_reminders(self))
 
-    async def check_reminders(self):
-        if hasattr(self, '_reminders_running') and self._reminders_running:
-            return
+    async def check_user_ban(self, user_id):
+        is_banned, reason = await ban_manager.is_user_banned(user_id)
         
-        self._reminders_running = True
-        logger.info("Запуск проверки напоминаний...")
-        
-        try:
-            while True:
-                try:
-                    await asyncio.sleep(10)  # Need more test for this...
-                    current_time = datetime.now()
-                    user_ids = os.listdir(REMINDERS_DIR)
+        if is_banned:
+            ban_file = os.path.join(ban_manager.bans_dir, f'{user_id}_ban.json')
+            
+            with open(ban_file, 'r', encoding='utf-8') as f:
+                ban_data = json.loads(f.read())
 
-                    for user_file in user_ids:
-                        user_id = int(user_file.split('_')[0])
-                        reminders = await load_reminders(user_id)
+            if ban_data['duration'] is None:
+                unban_text = "Перманентный бан"
+            else:
+                ban_time = datetime.fromisoformat(ban_data['timestamp'])
+                duration = timedelta(**ban_data['duration'])
+                unban_date = (ban_time + duration).strftime('%Y-%m-%d %H:%M:%S')
+                unban_text = f"Дата разблокировки: {unban_date}"
 
-                        for reminder in reminders[:]:
-                            reminder_time = datetime.fromisoformat(reminder['time'])
+            return True, f"Вам заблокирован доступ к использованию этим ботом.\nПричина: {reason}\n{unban_text}"
 
-                            if (reminder_time.year == current_time.year and
-                                reminder_time.month == current_time.month and
-                                reminder_time.day == current_time.day and
-                                reminder_time.hour == current_time.hour and
-                                reminder_time.minute == current_time.minute):
-                                
-                                try:
-                                    user = await self.fetch_user(user_id)
-                                    if user:
-                                        await user.send(f"> :alarm_clock: **Привет! :wave: Вы просили меня напомнить вас о:** \n {reminder['message']}")
-                                        logger.info(f"check_reminders: Отправлено напоминание пользователю {user_id}: {reminder['message']}")
-                                        reminders.remove(reminder)
-                                except Exception as e:
-                                    logger.error(f"check_reminders: Ошибка при обработке напоминания: {e}")
-
-                            elif reminder_time < current_time:
-                                try:
-                                    user = await self.fetch_user(user_id)
-                                    if user:
-                                        await user.send(f"> :warning: **Извините :persevere: , из-за технических проблем с нашей стороны мы не смогли вовремя напомнить вам о:** \n> {reminder['message']}")
-                                        logger.info(f"check_reminders: Просроченное напоминание для пользователя {user_id}: {reminder['message']}")
-                                        reminders.remove(reminder)
-                                except Exception as e:
-                                    logger.error(f"check_reminders: Ошибка при обработке просроченного напоминания: {e}")
-                        
-                        await save_reminders(user_id, reminders)
-                except Exception as e:
-                    logger.error(f"check_reminders: Ошибка в цикле проверки напоминаний: {e}")
-                    await asyncio.sleep(30) # Wait after error for restore
-        finally:
-            self._reminders_running = False
+        return False, None
 
     async def process_messages(self):
         while True:
@@ -195,88 +169,26 @@ class DiscordClient(discord.Client):
             
     async def process_request(self, query, request_type="search"):
         try:
+            results = await search_web(query, request_type)
+            
             if request_type == 'search':
-                logger.info(f"Поиск по запросу: {query}")
-                results = DDGS().text(query, max_results=3, region="wt-wt", safesearch="moderate", backend="auto")
-                tasks = [self.get_website_info(result.get('href')) for result in results if result.get('href')]
-                website_info = await asyncio.gather(*tasks)
                 conversation_history = []
-                
-                for result, (title, paragraphs) in zip(results, website_info):
-                    if title and paragraphs:
-                        conversation_history.append(f"Ссылка на ресурс: {result.get('href', 'Ссылка не указана')}\nНазвание: {title}\nСодержимое:\n{paragraphs}\n")
-                
-                return conversation_history or [f"По запросу '{query}' ничего не найдено."]
-                
+                for result in results:
+                    instruction = get_web_search_instruction(result)
+                    conversation_history.append(instruction)
+                return conversation_history
+            
             elif request_type == 'images':
-                logger.info(f"Картинки по запросу: {query}")
-                results = DDGS().images(query, max_results=5, region="wt-wt", safesearch="moderate")
-                image_links = [result['image'] for result in results if result.get('image')]
-                
-                return image_links or [f"Не удалось найти картинки по запросу '{query}'."]
+                instructions = [get_image_search_instruction(result) for result in results]
+                return instructions or [f"Не удалось найти картинки по запросу '{query}'."]
             
             elif request_type == 'videos':
-                logger.info(f"Поиск видео по запросу: {query}")
-                results = DDGS().videos(query, max_results=5, region="wt-wt", safesearch="moderate")
-                media_links = [result['content'] for result in results if result.get('content')]
-                
-                return media_links or [f"Не удалось найти видео по запросу '{query}'."]
+                instructions = [get_video_search_instruction(result) for result in results]
+                return instructions or [f"Не удалось найти видео по запросу '{query}'."]
         
         except Exception as e:
             logger.error(f"Ошибка в process_request: {e}")
             return [f"Произошла ошибка при поиске: {e}"]
-
-    async def get_website_info(self, url):
-        try:
-            async with aiohttp.ClientSession() as session:
-                try:
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                        response.raise_for_status()
-                        
-                        # Ограничиваем размер контента до 500 КБ
-                        content = await response.read()
-                        if len(content) > 500 * 1024:  # 500 КБ
-                            return None, "Слишком большой объем контента для обработки."
-                        
-                        html = content.decode('utf-8', errors='ignore')
-                        soup = BeautifulSoup(html, 'html.parser')
-                        
-                        # Удаляем скрипты и стили
-                        for script in soup(["script", "style"]):
-                            script.decompose()
-                        
-                        title = soup.title.text if soup.title else "Без названия"
-                        
-                        # Берем первые 5 параграфов или первые 1000 символов
-                        paragraphs = soup.find_all('p')
-                        processed_paragraphs = []
-                        total_chars = 0
-                        
-                        for p in paragraphs:
-                            if total_chars > 1000:
-                                break
-                            
-                            text = p.get_text(strip=True)
-                            if text and len(text) > 30:  # Пропускаем слишком короткие параграфы
-                                processed_paragraphs.append(text)
-                                total_chars += len(text)
-                            
-                            if len(processed_paragraphs) >= 5:
-                                break
-                        
-                        return title, '\n'.join(processed_paragraphs)
-                
-                except aiohttp.ClientTimeout:
-                    logger.error(f"get_website_info: Превышено время ожидания для {url}")
-                    return None, "Время загрузки сайта истекло. Попробуйте позже."
-                
-                except aiohttp.ClientError as e:
-                    logger.error(f"get_website_info: Ошибка сети при получении информации с {url}: {e}")
-                    return None, f"Не удалось загрузить сайт. Возможно, он недоступен. Ошибка: {e}"
-        
-        except Exception as e:
-            logger.exception(f"get_website_info: Не удалось получить информацию с сайта {url}: {e}")
-            return None, f"Произошла неизвестная ошибка при обработке сайта. Попробуйте еще раз."
 
     async def enqueue_message(self, message, user_message, request_type):
         await self.message_queue.put((message, user_message, request_type))
@@ -312,7 +224,6 @@ class DiscordClient(discord.Client):
                 logger.warning("send_start_prompt: Системные инструкции не установлены")
                 return
 
-            # Wait for the client to be ready before getting the channel
             await self.wait_until_ready()
             
             channel = self.get_channel(int(discord_channel_id))
@@ -335,11 +246,15 @@ class DiscordClient(discord.Client):
             logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
             
     async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
+        if user_id:
+            is_banned, ban_message = await self.check_user_ban(user_id)
+            if is_banned:
+                return ban_message
+
         try:
             user_data = await self.load_user_data(user_id)
             conversation_history = user_data.get('history', [])
             user_model = user_data.get('model', self.default_model)
-
             conversation_history.append({'role': 'user', 'content': user_message})
 
             if len(conversation_history) > self.max_history_length:
@@ -348,16 +263,10 @@ class DiscordClient(discord.Client):
             if request_type:
                 try:
                     search_results = await self.process_request(user_message, request_type=request_type)
+
                     for result in search_results:
-                        instruction = (
-                            "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. "
-                            "ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ ПОЛЬЗОВАТЕЛЮ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, "
-                            "И ОБЯЗАТЕЛЬНО УКАЖИ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА, "
-                            "ТО СООБЩИ ПОЛЬЗОВАТЕЛЮ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ. "
-                            "ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ КАРТИНКИ ИЛИ ВИДЕО, ТО ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА!]: "
-                            f"Результат поиска: {result}"
-                        )
-                        conversation_history.append({'role': 'assistant', 'content': instruction})
+                        conversation_history.append({'role': 'assistant', 'content': result})
+                
                 except Exception as search_error:
                     logger.error(f"Ошибка при поиске: {search_error}")
                     conversation_history.append({
@@ -367,7 +276,7 @@ class DiscordClient(discord.Client):
 
             retry_provider = await self.get_provider_for_model(user_model)
             retry_provider.reset()
-            
+
             attempts = 0
             max_attempts = len(retry_provider.providers)
             last_error = None
@@ -376,12 +285,14 @@ class DiscordClient(discord.Client):
             while attempts < max_attempts:
                 try:
                     current_provider = retry_provider.get_next_provider()
-                    logger.info(f"handle_response: Текущий провайдер выбран: {current_provider}")
+                    logger.info(f"handle_response: Выбран провайдер: {current_provider}")
+
                     self.chatBot = AsyncClient(provider=current_provider)
-                    response: ChatCompletion = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
+                    response = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
                     break
+                
                 except Exception as e:
-                    logger.exception(f"handle_response: Ошибка с провайдером {current_provider}: {e}")
+                    logger.exception(f"handle_response: Ошибка с провайдером: {current_provider}: {e}")
                     last_error = e
                     attempts += 1
 
@@ -390,10 +301,12 @@ class DiscordClient(discord.Client):
                         "Пожалуйста, попробуйте позже или смените модель.\n\n"
                         f"**Код ошибки:** ```{last_error}```")
 
-            model_response = f"> :robot: **Вам отвечает модель:** *{user_model}* \n > :wrench: **Версия {os.environ.get('BOT_NAME')}:** *{os.environ.get('VERSION_BOT')}*"
+            model_response = (
+                f"> :robot: **Вам отвечает модель:** *{user_model}* \n"
+                f"> :wrench: **Версия {os.environ.get('BOT_NAME')}:** *{os.environ.get('VERSION_BOT')}*"
+            )
             bot_response = response.choices[0].message.content
             conversation_history.append({'role': 'assistant', 'content': bot_response})
-
             await self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
             return f"{model_response}\n\n{bot_response}"
         
@@ -429,11 +342,11 @@ class DiscordClient(discord.Client):
             return user_data_cache[user_id]
 
         filepath = await self.get_user_data_filepath(user_id)
-        if os.path.exists(filepath):
-            async with aiofiles.open(filepath, 'r', encoding='utf-8') as file:
-                data = await file.read()
-                user_data_cache[user_id] = json.loads(data)
-                return user_data_cache[user_id]
+        data = await read_json(filepath)
+        
+        if data:
+            user_data_cache[user_id] = data
+            return data
         else:
             initial_data = {'history': [], 'model': self.default_model}
             await self.save_user_data(user_id, initial_data)
@@ -441,8 +354,7 @@ class DiscordClient(discord.Client):
 
     async def save_user_data(self, user_id, data):
         filepath = await self.get_user_data_filepath(user_id)
-        async with aiofiles.open(filepath, 'w', encoding='utf-8') as file:
-            await file.write(json.dumps(data, ensure_ascii=False, indent=4))
+        await write_json(filepath, data)
         user_data_cache[user_id] = data
 
 discordClient = DiscordClient()
