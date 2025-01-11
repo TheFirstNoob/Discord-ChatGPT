@@ -194,7 +194,12 @@ class DiscordClient(discord.Client):
         await self.message_queue.put((message, user_message, request_type))
 
     async def send_message(self, message, user_message, request_type):
-        user_id = message.user.id
+        if hasattr(message, 'user'):
+            user_id = message.user.id
+        elif hasattr(message, 'author'):
+            user_id = message.author.id
+        else:
+            raise ValueError("send_message: Неподдерживаемый тип объекта message")
 
         try:
             response = await self.handle_response(user_id, user_message, request_type)

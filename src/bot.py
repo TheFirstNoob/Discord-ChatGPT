@@ -590,6 +590,19 @@ async def run_discord_bot():
             for user in banned_users
         ])
         await interaction.followup.send(f"Забаненные пользователи:\n{banned_list}")
+        
+    @discordClient.event
+    async def on_message(message):
+        if message.author == discordClient.user:
+            return
+
+        if discordClient.user in message.mentions:
+            clean_message = message.content.replace(f'<@{discordClient.user.id}>', '').strip()
+            
+            if clean_message:
+                discordClient.current_channel = message.channel
+                logger.info(f"\x1b[31m{message.author}\x1b[0m : Упоминание бота [{clean_message}] в ({message.channel})")
+                await discordClient.enqueue_message(message, clean_message, None)
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
     await discordClient.start(TOKEN)
