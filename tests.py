@@ -1,9 +1,11 @@
+import os
 import asyncio
 import json
 import logging
 import time
 import g4f.debug
 
+from g4f.cookies import set_cookies_dir, read_cookie_files
 from g4f.client import AsyncClient
 from g4f.Provider import RetryProvider
 from src.aclient import _initialize_providers
@@ -12,6 +14,10 @@ client = AsyncClient()
 
 g4f.debug.logging = True
 g4f.debug.version_check = True
+
+cookies_dir = os.path.join(os.path.dirname(__file__), "har_and_cookies")
+set_cookies_dir(cookies_dir)
+read_cookie_files(cookies_dir)
 
 class ColoredFormatter(logging.Formatter):
     INFO_COLOR = '\x1b[34;1m'  # Синий

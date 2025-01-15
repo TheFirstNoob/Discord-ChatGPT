@@ -11,19 +11,18 @@ from discord import app_commands, Attachment
 
 # g4f
 import g4f.debug
+from g4f.cookies import set_cookies_dir, read_cookie_files
 from g4f.client import AsyncClient
 from g4f.Provider import (
-    Airforce,
     Blackbox,
-    ChatGptEs,
     DDG,
     DarkAI,
     Free2GPT,
     GizAI,
     TeachAnything,
-    Mhystical,
     PollinationsAI,
-    DeepInfraChat,
+    HuggingChat,    # For test
+    #DeepInfraChat, # For test
     RetryProvider
 )
 
@@ -46,6 +45,16 @@ load_dotenv()
 client = AsyncClient()
 g4f.debug.logging = os.getenv("G4F_DEBUG", "True")
 user_data_cache = {}
+
+current_dir = os.path.dirname(__file__)
+parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+cookies_dir = os.path.join(parent_dir, "har_and_cookies")
+
+if os.path.isdir(cookies_dir):
+    set_cookies_dir(cookies_dir)
+    read_cookie_files(cookies_dir)
+else:
+    print(f"har_and_cookies: Директория {cookies_dir} не читается или не существует.")
 
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
@@ -84,21 +93,20 @@ def _initialize_providers():
     return {
         # Chat providers
         "gpt-3.5-turbo": [DarkAI],
-        "gpt-4": [Mhystical],
-        "gpt-4o-mini": [ChatGptEs, DDG],
-        "gpt-4o": [Blackbox, PollinationsAI, ChatGptEs, DarkAI],
+        "gpt-4o-mini": [DDG],
+        "gpt-4o": [Blackbox, PollinationsAI, DarkAI],
         "claude-3-haiku": [DDG],
         "claude-3.5-sonnet": [Blackbox, PollinationsAI],
         "blackboxai": [Blackbox],
-        "blackboxai-pro": [Blackbox],
+        "command-r-plus": [HuggingChat],
+        #"blackboxai-pro": [Blackbox], # temp disable for faster test
         "gemini-flash": [GizAI],
         "gemini-pro": [Blackbox],
-        "llama-3.1-70b": [Blackbox, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, Airforce, DDG, DarkAI],
+        "llama-3.1-70b": [Blackbox, PollinationsAI, TeachAnything, Free2GPT, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
-        "llama-3.3-70b": [Blackbox, DeepInfraChat],
-        "qwq-32b": [Blackbox, DeepInfraChat],
+        "llama-3.3-70b": [Blackbox],
+        "qwq-32b": [Blackbox],
         "deepseek-chat": [Blackbox],
-        "lfm-40b": [Airforce],
         "mixtral-8x7b": [DDG]
     }
 
@@ -148,9 +156,9 @@ class DiscordClient(discord.Client):
                 ban_time = datetime.fromisoformat(ban_data['timestamp'])
                 duration = timedelta(**ban_data['duration'])
                 unban_date = (ban_time + duration).strftime('%Y-%m-%d %H:%M:%S')
-                unban_text = f"Дата разблокировки: {unban_date}"
+                unban_text = f"**Дата разблокировки**: {unban_date}"
 
-            return True, f"Вам заблокирован доступ к использованию этим ботом.\nПричина: {reason}\n{unban_text}"
+            return True, f"Вам заблокирован доступ к использованию этим ботом.\n**Причина**: {reason}\n{unban_text}"
 
         return False, None
 
