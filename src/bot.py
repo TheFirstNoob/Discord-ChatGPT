@@ -161,23 +161,33 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
     @app_commands.choices(model=[
-        app_commands.Choice(name="GPT 3.5-Turbo (OpenAI)", value="gpt-3.5-turbo"),
-        app_commands.Choice(name="GPT 4 (OpenAI)", value="gpt-4"),
+        #app_commands.Choice(name="GPT 3.5-Turbo (OpenAI)", value="gpt-3.5-turbo"),
+        #app_commands.Choice(name="GPT 4 (OpenAI)", value="gpt-4"),
         app_commands.Choice(name="GPT 4o-Mini (OpenAI)", value="gpt-4o-mini"),
         app_commands.Choice(name="GPT 4o (OpenAI)", value="gpt-4o"),
         app_commands.Choice(name="Claude 3 Haiku (Anthropic)", value="claude-3-haiku"),
         app_commands.Choice(name="Claude 3.5 Sonnet (Anthropic)", value="claude-3.5-sonnet"),
         app_commands.Choice(name="Blackbox (Blackbox AI)", value="blackboxai"),
-        app_commands.Choice(name="Blackbox PRO (Blackbox AI)", value="blackboxai-pro"),
-        app_commands.Choice(name="Gemini Flash (Google)", value="gemini-flash"),
-        app_commands.Choice(name="Gemini Pro (Google)", value="gemini-pro"),
+        #app_commands.Choice(name="Blackbox PRO (Blackbox AI)", value="blackboxai-pro"),
+        app_commands.Choice(name="Gemini 1.5 Flash (Google)", value="gemini-flash"),
+        app_commands.Choice(name="Gemini 1.5 Pro (Google)", value="gemini-pro"),
+        app_commands.Choice(name="Command R+ (Cohere)", value="command-r-plus"),
+        app_commands.Choice(name="Command R7B+ (Cohere)", value="command-r7b-12-2024"),
         app_commands.Choice(name="LLaMa v3.1 70B (MetaAI)", value="llama-3.1-70b"),
-        app_commands.Choice(name="LLaMa v3.3 70B (MetaAI)", value="llama-3.3-70b"),
         app_commands.Choice(name="LLaMa v3.1 405B (MetaAI)", value="llama-3.1-405b"),
-        app_commands.Choice(name="QwQ 32B Preview (Qwen Team)", value="qwq-32b"),
+        app_commands.Choice(name="LLaMa v3.2 11B Vision (MetaAI)", value="llama-3.2-11b"),
+        app_commands.Choice(name="LLaMa v3.3 70B (MetaAI)", value="llama-3.3-70b"),
+        app_commands.Choice(name="QwQ 32B Thinking (Qwen Team)", value="qwq-32b"),
+        app_commands.Choice(name="QvQ 72B Vision (Qwen Team)", value="qwen-qvq-72b-preview"),
+        app_commands.Choice(name="Qwen 2 72B (Qwen Team)", value="qwen-2-72b"),
+        app_commands.Choice(name="Qwen 2.5 72B (Qwen Team)", value="qwen-2.5-72b"),
+        app_commands.Choice(name="Qwen 2.5 Coder 32B (Qwen Team)", value="qwen-2.5-coder-32b"),
         app_commands.Choice(name="DeepSeek LLM 67B (DeepSeek AI)", value="deepseek-chat"),
+        app_commands.Choice(name="Nemotron 70B Llama (Nvidia)", value="nemotron-70b"),
+        app_commands.Choice(name="Cably 80B (Cably Team Zhipu AI)", value="cably-80b"),
+        app_commands.Choice(name="GLM-4 230B (GLM Team)", value="glm-4"),
         app_commands.Choice(name="Mixtral-8x7B (Mistral)", value="mixtral-8x7b"),
-        app_commands.Choice(name="LFM 40B (Liquid)", value="lfm-40b"),
+        app_commands.Choice(name="Phi 3.5 Mini (Microsoft)", value="phi-3.5-mini"),
     ])
     async def chat_model(
         interaction: discord.Interaction,
@@ -237,6 +247,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="4.2.0", value="4.2.0"),
         app_commands.Choice(name="4.1.0", value="4.1.0"),
         app_commands.Choice(name="4.0.0", value="4.0.0"),
         app_commands.Choice(name="3.5.1", value="3.5.1"),
@@ -598,9 +609,10 @@ async def run_discord_bot():
 
         if discordClient.user in message.mentions:
             clean_message = message.content.replace(f'<@{discordClient.user.id}>', '').strip()
-            
+
             if clean_message:
                 discordClient.current_channel = message.channel
+
                 logger.info(f"\x1b[31m{message.author}\x1b[0m : Упоминание бота [{clean_message}] в ({message.channel})")
                 await discordClient.enqueue_message(message, clean_message, None)
 

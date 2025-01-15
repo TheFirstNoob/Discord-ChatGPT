@@ -69,7 +69,7 @@ class ProviderChecker:
         async for model, provider in self.iterate_providers():
             task = asyncio.create_task(self.check_provider(model, provider))
             tasks.append(task)
-            await asyncio.sleep(0.5) # Должно работать лучше с ним!
+            await asyncio.sleep(1)
 
         await asyncio.gather(*tasks)
 

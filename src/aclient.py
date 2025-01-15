@@ -14,15 +14,35 @@ import g4f.debug
 from g4f.cookies import set_cookies_dir, read_cookie_files
 from g4f.client import AsyncClient
 from g4f.Provider import (
+    #AmigoChat, # Quota limits
+    #AutonomousAI,  # g4f error
+    #Anthropic, # RU region blocked
     Blackbox,
+    BlackboxCreateAgent,
+    CablyAI,
+    ChatGLM,
+    ChatGptEs,
+    ChatGptt, # 10-30+ sec for response
+    #Cerebras,  # Cloudflare detected
     DDG,
     DarkAI,
+    DeepInfraChat, # Request AUTH (har/cookies)
+    #DeepSeek,  # Request api
     Free2GPT,
+    #FreeGpt,    # China lang only
     GizAI,
+    #GlhfChat, # Request api
+    #Groq,  # Cloudflare detected
     TeachAnything,
     PollinationsAI,
-    HuggingChat,    # For test
-    #DeepInfraChat, # For test
+    #Reka,  # Cloudflare detected
+    #PerplexityLabs,    # Unknown error
+    HuggingChat,    # Request AUTH (har/cookies)
+    HuggingSpace,    # Request AUTH (har/cookies)
+    #Jmuz,  # g4f error
+    #Mhystical, # Cloudflare detected
+    #RubiksAI, # Cloudflare detected
+
     RetryProvider
 )
 
@@ -92,22 +112,33 @@ class RetryProvider:
 def _initialize_providers():
     return {
         # Chat providers
-        "gpt-3.5-turbo": [DarkAI],
-        "gpt-4o-mini": [DDG],
-        "gpt-4o": [Blackbox, PollinationsAI, DarkAI],
+        #"gpt-3.5-turbo": [DarkAI],
+        "gpt-4o-mini": [DDG, ChatGptEs, ChatGptt],
+        "gpt-4o": [Blackbox, PollinationsAI, DarkAI, ChatGptEs, ChatGptt],
         "claude-3-haiku": [DDG],
         "claude-3.5-sonnet": [Blackbox, PollinationsAI],
         "blackboxai": [Blackbox],
-        "command-r-plus": [HuggingChat],
-        #"blackboxai-pro": [Blackbox], # temp disable for faster test
-        "gemini-flash": [GizAI],
-        "gemini-pro": [Blackbox],
-        "llama-3.1-70b": [Blackbox, PollinationsAI, TeachAnything, Free2GPT, DDG, DarkAI],
+        "command-r-plus": [HuggingSpace, HuggingChat],
+        "command-r7b-12-2024": [HuggingSpace],
+        #"blackboxai-pro": [Blackbox],
+        "gemini-1.5-flash": [Blackbox, GizAI],
+        "gemini-1.5-pro": [Blackbox],
+        "llama-3.1-70b": [Blackbox, BlackboxCreateAgent, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
-        "llama-3.3-70b": [Blackbox],
-        "qwq-32b": [Blackbox],
-        "deepseek-chat": [Blackbox],
-        "mixtral-8x7b": [DDG]
+        "llama-3.2-11b": [HuggingChat],
+        "llama-3.3-70b": [Blackbox, HuggingChat, DeepInfraChat, PollinationsAI],
+        "qwq-32b": [Blackbox, HuggingChat, DeepInfraChat],
+        "qwen-qvq-72b-preview": [HuggingSpace],
+        "qwen-2-72b": [PollinationsAI, DeepInfraChat],
+        "qwen-2.5-72b": [HuggingChat, HuggingSpace],
+        "qwen-2.5-coder-32b": [HuggingChat, DeepInfraChat, PollinationsAI],
+        #"wizardlm-2-8x22b": [DeepInfraChat],
+        "nemotron-70b": [HuggingChat, DeepInfraChat],
+        "deepseek-chat": [Blackbox, PollinationsAI],
+        "mixtral-8x7b": [DDG],
+        "cably-80b": [CablyAI],
+        "glm-4": [ChatGLM],
+        "phi-3.5-mini": [HuggingChat],
     }
 
 class DiscordClient(discord.Client):
@@ -156,9 +187,9 @@ class DiscordClient(discord.Client):
                 ban_time = datetime.fromisoformat(ban_data['timestamp'])
                 duration = timedelta(**ban_data['duration'])
                 unban_date = (ban_time + duration).strftime('%Y-%m-%d %H:%M:%S')
-                unban_text = f"**Дата разблокировки**: {unban_date}"
+                unban_text = f"Дата разблокировки: {unban_date}"
 
-            return True, f"Вам заблокирован доступ к использованию этим ботом.\n**Причина**: {reason}\n{unban_text}"
+            return True, f":x: Вам заблокирован доступ к использованию этим ботом!\n**Причина**: {reason}\n{unban_text}"
 
         return False, None
 
@@ -251,7 +282,7 @@ class DiscordClient(discord.Client):
                 await channel.send(f"{response}")
                 logger.info("send_start_prompt: Ответ от ИИ получен. Функция отработала корректно!")
             else:
-                logger.warning("send_start_prompt: Не получен ответ от ИИ")
+                logger.warning("send_start_prompt: Ошибка получения ответа от ИИ!")
                 
         except ValueError as e:
             logger.error(f"send_start_prompt: Ошибка при конвертации ID канала: {e}")
@@ -281,7 +312,7 @@ class DiscordClient(discord.Client):
                         conversation_history.append({'role': 'assistant', 'content': result})
                 
                 except Exception as search_error:
-                    logger.error(f"Ошибка при поиске: {search_error}")
+                    logger.error(f"handle_respose: Ошибка при поиске: {search_error}")
                     conversation_history.append({
                         'role': 'system', 
                         'content': f"ОШИБКА ПРИ ПОИСКЕ: {str(search_error)}"

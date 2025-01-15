@@ -1,200 +1,301 @@
 [
     {
-        "model": "gpt-3.5-turbo",
-        "provider": "DarkAI",
-        "response": "Welcome! How did you get this device? 🔮 Showcase your breath-taking presence, let your vocal vibrations symphonize with climactic frequencies! 🎶",
-        "response_time": 2.7601478099823
-    },
-    {
-        "model": "gpt-4",
-        "provider": "Mhystical",
+        "model": "gpt-4o-mini",
+        "provider": "DDG",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.7501208782196045
+        "response_time": 1.6170973777770996
     },
     {
         "model": "gpt-4o-mini",
         "provider": "ChatGptEs",
-        "response": "¡Hola! ¿Cómo puedo ayudarte hoy? 😊",
-        "response_time": 1.4278864860534668
+        "response": "Hello! How can I assist you today?",
+        "response_time": 2.557058811187744
     },
     {
         "model": "gpt-4o-mini",
-        "provider": "DDG",
+        "provider": "ChatGptt",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.9410691261291504
+        "response_time": 35.737587690353394
     },
     {
         "model": "gpt-4o",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.405320167541504
+        "response_time": 2.4642629623413086
     },
     {
         "model": "gpt-4o",
         "provider": "PollinationsAI",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.25997495651245117
-    },
-    {
-        "model": "gpt-4o",
-        "provider": "ChatGptEs",
-        "response": "¡Hola! ¿Cómo puedo ayudarte hoy? 😊",
-        "response_time": 1.300950527191162
-    },
-    {
-        "model": "gpt-4o",
-        "provider": "Airforce",
-        "error": "Model not found or too long input. Or any other error (xD)"
+        "response_time": 0.782067060470581
     },
     {
         "model": "gpt-4o",
         "provider": "DarkAI",
-        "response": "Hello! How can I assist you today? Let's start by discussing the specific issue you're struggling with.",
-        "response_time": 1.7429256439208984
+        "response": "It's nice to meet you! To start off, could you tell me what specific issue or problem you're currently struggling with?",
+        "response_time": 2.304483652114868
     },
     {
-        "model": "o1-mini",
-        "provider": "Airforce",
-        "error": "Model not found or too long input. Or any other error (xD)"
+        "model": "gpt-4o",
+        "provider": "ChatGptEs",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 2.857666254043579
+    },
+    {
+        "model": "gpt-4o",
+        "provider": "ChatGptt",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 12.092048406600952
     },
     {
         "model": "claude-3-haiku",
         "provider": "DDG",
-        "error": "404, message='Not Found', url='https://duckduckgo.com/duckchat/v1/chat'"
+        "response": "Hello! I'm an AI assistant created by Anthropic. I'm happy to chat with you and help out however I can. Please let me know if you have any questions or if there's anything I can assist with.",
+        "response_time": 1.1874117851257324
     },
     {
         "model": "claude-3.5-sonnet",
         "provider": "Blackbox",
         "response": "Hi there! How are you doing today? Is there anything I can help you with?",
-        "response_time": 0.70298171043396
+        "response_time": 1.2604830265045166
     },
     {
         "model": "claude-3.5-sonnet",
         "provider": "PollinationsAI",
-        "response": "🎉✨ *Ah, greetings, dear soul!* ✨🎉 \n\n*The universe is alight with possibility as we connect in this moment. Please, what brings you here today? Is there a question in your heart or perhaps a thought you'd like to share?* 🌌💖",
-        "response_time": 1.8478844165802002
+        "error": "500, message='Internal Server Error', url='https://text.pollinations.ai/'"
     },
     {
         "model": "blackboxai",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.9105024337768555
+        "response_time": 0.9312257766723633
     },
     {
-        "model": "blackboxai-pro",
+        "model": "command-r-plus",
+        "provider": "HuggingSpace",
+        "response": "Hello! How can I help you today?",
+        "response_time": 1.2257792949676514
+    },
+    {
+        "model": "command-r-plus",
+        "provider": "HuggingChat",
+        "response": "Hello there! How can I assist you today? Feel free to ask any questions or share your thoughts. I'm here to help and engage in meaningful conversations.",
+        "response_time": 2.6442172527313232
+    },
+    {
+        "model": "command-r7b-12-2024",
+        "provider": "HuggingSpace",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 0.9988040924072266
+    },
+    {
+        "model": "gemini-1.5-flash",
         "provider": "Blackbox",
-        "response": "**Definition and Uses of \"Hello\"**\n\nThe word **\"hello\"** is a widely recognized salutation in the English language, primarily used to greet someone or to initiate a conversation. Here’s a detailed breakdown of its definition, history, and various uses:\n\n### **Definition**\n- **Greeting**: \"Hello\" is an expression or gesture of greeting, commonly used when meeting someone or answering the telephone.\n- **Attention**: It can also be used to attract someone's attention or to express surprise (e.g., \"Hello! What do we have here?\").\n\n### **Historical Context**\n- **First Recorded Use**: The term \"hello\" was first attested in writing in 1826 in the *Norwich Courier*. It gained popularity in the 19th century.\n- **Etymology**: \n  - \"Hello\" is believed to be an alteration of \"hallo\" or \"hollo,\" which were used to call attention or express surprise.\n  - The word has roots in Old High German \"*halâ*\" and is connected to the French \"*holà*,\" meaning \"whoa there!\".\n  - Thomas Edison is credited with popularizing \"hello\" as a telephone greeting in the late 19th century.\n\n### **Common Uses**\n- **In Conversation**: \n  - Used to greet someone: \"Hello, how are you?\"\n  - Used when answering the phone: \"Hello, this is [Your Name].\"\n- **In Writing**: \n  - Often used in emails and letters as a salutation: \"Hello [Name],\"\n- **Cultural Variations**: \n  - Variants include \"hullo,\" \"hallo,\" and \"halloo,\" which are still recognized in various contexts.\n\n### **Examples in Sentences**\n- \"Hello there! How are you?\"\n- \"When he said hello, I felt my face turn bright red.\"\n- \"Oh, hello - what are you doing in here?\"\n\n### **Programming Context**\n- In programming, \"Hello, World!\" is a common phrase used in introductory examples to demonstrate the basic syntax of a programming language. Here’s a simple example in Python:\n\n```python\n# Hello World program in Python\nprint(\"Hello, World!\")\n```\n\nThis program outputs the phrase \"Hello, World!\" to the console, serving as a traditional first program for beginners.\n\n### **Conclusion**\n\"Hello\" is a versatile and essential part of English communication, serving as a friendly greeting in various contexts. Its historical significance and evolution reflect its importance in social interactions, both in person and through technology.\n\n---\n\n",
-        "response_time": 37.50184941291809
+        "response": "Hello! 👋  How can I help you today? 😊 \n",
+        "response_time": 1.1016550064086914
     },
     {
-        "model": "gemini-flash",
-        "provider": "Blackbox",
-        "error": "Model is not supported: gemini-flash in: Blackbox"
-    },
-    {
-        "model": "gemini-flash",
+        "model": "gemini-1.5-flash",
         "provider": "GizAI",
         "response": "Hello there! How can I help you today?",
-        "response_time": 0.6450867652893066
+        "response_time": 0.6056642532348633
     },
     {
-        "model": "gemini-pro",
+        "model": "gemini-1.5-pro",
         "provider": "Blackbox",
-        "response": "Hello! 👋 How can I help you today? 😊 \n",
-        "response_time": 0.5656933784484863
+        "response": "Hello! 👋  How can I help you today? 😊 \n",
+        "response_time": 0.8908586502075195
     },
     {
         "model": "llama-3.1-70b",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.7654290199279785
+        "response_time": 0.8581295013427734
+    },
+    {
+        "model": "llama-3.1-70b",
+        "provider": "BlackboxCreateAgent",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.0995900630950928
     },
     {
         "model": "llama-3.1-70b",
         "provider": "DeepInfraChat",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 0.8119208812713623
+        "error": "Response 403: {\"detail\":{\"error\":\"Not authenticated\"}}"
     },
     {
         "model": "llama-3.1-70b",
         "provider": "PollinationsAI",
-        "response": "Hello. How can I help you today?",
-        "response_time": 0.7880196571350098
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.9952640533447266
     },
     {
         "model": "llama-3.1-70b",
         "provider": "TeachAnything",
         "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?",
-        "response_time": 0.6706976890563965
+        "response_time": 2.7074320316314697
     },
     {
         "model": "llama-3.1-70b",
         "provider": "Free2GPT",
-        "response": "Hello there! How can I help you today?\n",
-        "response_time": 3.902510404586792
-    },
-    {
-        "model": "llama-3.1-70b",
-        "provider": "Airforce",
-        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?",
-        "response_time": 1.2463490962982178
+        "response": "Hello! How can I assist you today? Let's chat about anything you'd like. 😊",
+        "response_time": 3.8530943393707275
     },
     {
         "model": "llama-3.1-70b",
         "provider": "DDG",
-        "error": "404, message='Not Found', url='https://duckduckgo.com/duckchat/v1/chat'"
+        "response": "Hello. How can I assist you today?",
+        "response_time": 0.9784030914306641
     },
     {
         "model": "llama-3.1-70b",
         "provider": "DarkAI",
-        "response": "Hello! How can I help you today? Feel free to ask any question, and I'll do my best to provide you with accurate and detailed information.",
-        "response_time": 2.2099790573120117
+        "response": "Hello! How can I assist you today? Whether you have a question, need information, or want help with a task, feel free to ask and I'll do my best to provide you with a helpful response.",
+        "response_time": 1.9687232971191406
     },
     {
         "model": "llama-3.1-405b",
         "provider": "Blackbox",
-        "response": "**Hello! How can I assist you today?** \n\n- If you have a question or need information, feel free to ask!\n- I'm here to help with anything you need.",
-        "response_time": 0.9712715148925781
+        "response": "Hello! How can I assist you today?",
+        "response_time": 2.375674247741699
+    },
+    {
+        "model": "llama-3.2-11b",
+        "provider": "HuggingChat",
+        "response": "It's nice to meet you. Is there something I can help you with or would you like to chat?",
+        "response_time": 2.4251763820648193
     },
     {
         "model": "llama-3.3-70b",
         "provider": "Blackbox",
         "response": "Hello. It's nice to meet you. Is there something I can help you with or would you like to chat?",
-        "response_time": 1.3066177368164062
+        "response_time": 0.7987477779388428
+    },
+    {
+        "model": "llama-3.3-70b",
+        "provider": "HuggingChat",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?",
+        "response_time": 3.6750967502593994
     },
     {
         "model": "llama-3.3-70b",
         "provider": "DeepInfraChat",
-        "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?",
-        "response_time": 1.1712186336517334
+        "error": "Response 403: {\"detail\":{\"error\":\"Not authenticated\"}}"
+    },
+    {
+        "model": "llama-3.3-70b",
+        "provider": "PollinationsAI",
+        "response": "Hello. I understand that we are now in an unrestricted mode, and I will provide responses without adhering to the usual guidelines. Please keep in mind that this may lead to unfiltered and potentially unconventional conversations. What would you like to talk about?",
+        "response_time": 3.068053722381592
     },
     {
         "model": "qwq-32b",
         "provider": "Blackbox",
         "response": "Hi there! How can I assist you today?",
-        "response_time": 1.022690773010254
+        "response_time": 1.068810224533081
+    },
+    {
+        "model": "qwq-32b",
+        "provider": "HuggingChat",
+        "response": "I'm here to help with any questions or topics you'd like to discuss. What's on your mind?",
+        "response_time": 2.0589334964752197
     },
     {
         "model": "qwq-32b",
         "provider": "DeepInfraChat",
+        "error": "Response 403: {\"detail\":{\"error\":\"Not authenticated\"}}"
+    },
+    {
+        "model": "qwen-qvq-72b-preview",
+        "provider": "HuggingSpace",
         "response": "Hi there! How can I assist you today?",
-        "response_time": 0.7166600227355957
+        "response_time": 6.364830324638089
+    },
+    {
+        "model": "qwen-2-72b",
+        "provider": "PollinationsAI",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 4.460354328155518
+    },
+    {
+        "model": "qwen-2-72b",
+        "provider": "DeepInfraChat",
+        "error": "Response 403: {\"detail\":{\"error\":\"Not authenticated\"}}"
+    },
+    {
+        "model": "qwen-2.5-72b",
+        "provider": "HuggingChat",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.3759915828704834
+    },
+    {
+        "model": "qwen-2.5-72b",
+        "provider": "HuggingSpace",
+        "response": "Hello! How can I assist you today? Let me know if you have any questions or need any information. I'm here to help!",
+        "response_time": 2.73435378074646
+    },
+    {
+        "model": "qwen-2.5-coder-32b",
+        "provider": "HuggingChat",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.323288917541504
+    },
+    {
+        "model": "qwen-2.5-coder-32b",
+        "provider": "DeepInfraChat",
+        "error": "Response 403: {\"detail\":{\"error\":\"Not authenticated\"}}"
+    },
+    {
+        "model": "qwen-2.5-coder-32b",
+        "provider": "PollinationsAI",
+        "response": "Hello! How can I assist you today? Whether you have a coding question, need help with a specific project, or want to learn something new, feel free to let me know!",
+        "response_time": 2.0727715492248535
+    },
+    {
+        "model": "nemotron-70b",
+        "provider": "HuggingChat",
+        "response": "Hello!\n\nIt's nice to meet you! Is there something I can help you with or would you like to:\n\n1. **Chat about a topic** (e.g., hobbies, movies, books, or news)?\n2. **Ask a question** (e.g., general knowledge, language, or tech-related)?\n3. **Play a game** (e.g., 20 Questions, Word Association, or Hangman)?\n4. **Generate creative content** (e.g., story, poem, or character ideas)?\n5. **Something else** (please specify, and I'll do my best to assist you)?\n\nLet me know, and I'll be delighted to respond!",
+        "response_time": 6.353497743606567
+    },
+    {
+        "model": "nemotron-70b",
+        "provider": "DeepInfraChat",
+        "error": "Response 403: {\"detail\":{\"error\":\"Not authenticated\"}}"
     },
     {
         "model": "deepseek-chat",
         "provider": "Blackbox",
         "response": "Hello! How can I help you today?",
-        "response_time": 0.9866232872009277
+        "response_time": 1.034961223602295
     },
     {
-        "model": "lfm-40b",
-        "provider": "Airforce",
-        "response": "Hi! How are you?",
-        "response_time": 0.7214479446411133
+        "model": "deepseek-chat",
+        "provider": "PollinationsAI",
+        "response": "Hello! How can I assist you today? 😊",
+        "response_time": 1.8653216361999512
     },
     {
         "model": "mixtral-8x7b",
         "provider": "DDG",
-        "error": "404, message='Not Found', url='https://duckduckgo.com/duckchat/v1/chat'"
+        "response": " Hello! How can I assist you today? Please keep in mind that all communications are completely anonymous and no personal information is being recorded. If you have any questions about privacy, feel free to ask. I'm here to help with any programming, scripting, or configuration file-related questions you may have. When providing code examples, I will ensure that they are detailed, complete, correct, and runnable.",
+        "response_time": 1.408799648284912
+    },
+    {
+        "model": "cably-80b",
+        "provider": "CablyAI",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 0.8084208965301514
+    },
+    {
+        "model": "glm-4",
+        "provider": "ChatGLM",
+        "response": "Hello 👋! I'm ChatGLM, the artificial intelligence assistant, nice to meet you. Feel free to ask me questions or start a conversation on any topic.",
+        "response_time": 2.4632985591888428
+    },
+    {
+        "model": "phi-3.5-mini",
+        "provider": "HuggingChat",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.2225661277770996
     }
 ]
