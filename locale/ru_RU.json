@@ -1,0 +1,109 @@
+{
+    "commands": {
+        "ask": {
+            "description": "Задать вопрос ChatGPT",
+            "message_description": "Введите ваш запрос",
+            "request_type_description": "Тип запроса через интернет (Поисковик, Изображение, Видео)",
+            "request_type_choices": {
+                "search": "Поисковик",
+                "images": "Изображение", 
+                "videos": "Видео"
+            }
+        },
+        "asklong": {
+            "description": "Задать длинный вопрос ChatGPT через текст и файл",
+            "message_description": "Введите ваш запрос",
+            "file_description": "Загрузите текстовый файл с вашим запросом/кодом и т.п.",
+            "request_type_description": "Тип запроса через интернет (Поисковик, Изображение, Видео)"
+        },
+        "askpdf": {
+            "description": "Извлечь текст из PDF-файла и задать вопрос ИИ",
+            "message_description": "Введите ваш запрос к ИИ",
+            "file_description": "Загрузите PDF-файл для извлечения текста"
+        },
+        "draw": {
+            "description": "Сгенерировать изображение от модели ИИ",
+            "prompt_description": "Введите ваш запрос (На Английском языке)",
+            "image_model_description": "Выберите модель для генерации изображения"
+        },
+        "draw-prodia": {
+            "description": "Сгенерировать изображение от модели ИИ с использованием Prodia",
+            "prompt_description": "Введите ваш запрос (На Английском языке)",
+            "image_model_description": "Выберите модель для генерации изображения"
+        },
+        "chat-model": {
+            "description": "Сменить модель чата",
+            "model_description": "Выберите модель для чата"
+        },
+        "remind-add": {
+            "description": "Создать напоминание",
+            "day_description": "День (1-31)",
+            "month_description": "Месяц (1-12)",
+            "year_description": "Год (например, 2023)",
+            "hour_description": "Часы (0-23)",
+            "minute_description": "Минуты (0-59)",
+            "offset_description": "Часовое смещение от времени МСК (например, +3 или -7)",
+            "message_description": "Сообщение напоминания"
+        }
+    },
+    "errors": {
+        "file_format_error": "> :x: **ОШИБКА:** Поддерживаются только текстовые форматы!",
+        "pdf_format_error": "> :x: **ОШИБКА:** Поддерживается только PDF-файлы!",
+        "file_read_error": "> :x: **ОШИБКА:** Не удалось прочитать файл. Поддерживаются только текстовые форматы!",
+        "no_permissions": "> :x: **У вас нет прав для этой команды!**",
+        "past_reminder_error": "> :x: **ОШИБКА:** Вы не можете установить напоминание на время в прошлом.",
+        "future_reminder_error": "> :x: **ОШИБКА:** Вы не можете установить напоминание больше чем на год.",
+        "time_format_error": "> :x: **ОШИБКА:** Неверный формат времени. Пожалуйста, убедитесь, что все значения корректны.",
+        "providers_unavailable": "> :x: **ОШИБКА:** К сожалению, все провайдеры для этой модели недоступны. Пожалуйста, попробуйте позже или смените модель.",
+        "critical_error": "> :x: **КРИТИЧЕСКАЯ ОШИБКА:** Не удалось обработать ваш запрос. Пожалуйста, попробуйте еще раз или сообщите администратору.",
+        "generation_error": "> :x: **ОШИБКА:** Не удалось сгенерировать изображение.",
+        "banned_user": "Вам заблокирован доступ к использованию этим ботом.\nПричина: {reason}\n{unban_text}"
+    },
+    "success": {
+        "model_changed": "> **ИНФО: Чат-модель изменена на: {model_name}.**",
+        "history_reset": "> :white_check_mark: **УСПЕШНО:** Ваша история и модели ИИ сброшены!",
+        "reminder_set": "> :white_check_mark: **Напоминание установлено на {reminder_time}!** \n Вы получите сообщение от меня когда настанет требуемое время :wink:",
+        "reminder_deleted": "> :white_check_mark: **Напоминание удалено!**",
+        "no_reminders": "> :warning: **У вас нет активных напоминаний.**",
+        "image_generated": ":paintbrush: **Изображение от модели**: {model_name}",
+        "prodia_image_generated": ":paintbrush: **Изображение Prodia от модели**: {model_name}",
+        "user_banned": "> :white_check_mark: **Пользователь {user_id} успешно забанен**",
+        "user_unbanned": "> :white_check_mark: **Пользователь {user_id} успешно разбанен**",
+        "no_banned_users": "> :white_check_mark: **Нет забаненных пользователей.**"
+    },
+    "reminders": {
+        "notification": "> :alarm_clock: **Привет! :wave: Вы просили меня напомнить вас о:** \n {message}",
+        "delayed_notification": "> :warning: **Извините :persevere: , из-за технических проблем с нашей стороны мы не смогли вовремя напомнить вам о:** \n> {message}"
+    },
+    "search": {
+        "search_request": "Поиск по запросу: {query}",
+        "images_request": "Картинки по запросу: {query}",
+        "videos_request": "Поиск видео по запросу: {query}",
+        "no_results": "По запросу '{query}' ничего не найдено.",
+        "no_images": "Не удалось найти картинки по запросу '{query}'.",
+        "no_videos": "Не удалось найти видео по запросу '{query}'.",
+        "search_error": "Произошла ошибка при поиске: {error}"
+    },
+    "website_info": {
+        "large_content": "Слишком большой объем контента для обработки.",
+        "timeout_error": "Время загрузки сайта истекло. Попробуйте позже.",
+        "network_error": "Не удалось загрузить сайт. Возможно, он недоступен. Ошибка: {error}",
+        "unknown_error": "Произошла неизвестная ошибка при об работке сайта. Попробуйте еще раз."
+    },
+	"ban_manager": {
+        "default_reason": "Нарушение правил",
+        "permanent_ban": "Перманентный бан",
+        "unban_date": "Дата разблокировки: {unban_date}",
+        "ban_message": "Вам заблокирован доступ к использованию этим ботом.\nПричина: {reason}\n{unban_text}",
+        "errors": {
+            "not_admin": "У вас нет прав для управления банами",
+            "ban_self_error": "Вы не можете забанить себя",
+            "invalid_user_id": "Некорректный идентификатор пользователя"
+        },
+        "success": {
+            "user_banned": "Пользователь {user_id} успешно забанен",
+            "user_unbanned": "Пользователь {user_id} успешно разбанен",
+            "no_banned_users": "Нет забаненных пользователей"
+        }
+    }
+}

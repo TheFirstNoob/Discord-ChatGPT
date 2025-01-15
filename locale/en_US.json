@@ -1,0 +1,18 @@
+{
+    "commands": {
+        "ask": {
+            "description": "Ask a question to ChatGPT",
+            "message_description": "Enter your request",
+            "request_type_description": "Request type through the internet (Search, Image, Video)"
+        },
+        "draw": {
+            "description": "Generate an image from AI model",
+            "prompt_description": "Enter your request (In English)",
+            "model_description": "Choose a model for image generation"
+        }
+    },
+    "errors": {
+        "no_permissions": "You do not have permission for this command!",
+        "banned_user": "You are blocked from using this bot."
+    }
+}
