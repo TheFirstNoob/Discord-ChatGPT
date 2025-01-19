@@ -52,10 +52,10 @@ async def run_discord_bot():
         message: str,
         request_type: Optional[str] = None
     ):
+        await interaction.response.defer(ephemeral=False)
+
         if await check_ban_and_respond(interaction):
             return
-    
-        await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
             return
@@ -87,10 +87,10 @@ async def run_discord_bot():
         file: Attachment,
         request_type: Optional[str] = None
     ):
+        await interaction.response.defer(ephemeral=False)
+
         if await check_ban_and_respond(interaction):
             return
-
-        await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
             return
@@ -125,10 +125,10 @@ async def run_discord_bot():
         message: str,
         file: Attachment
     ):
+        await interaction.response.defer(ephemeral=False)
+
         if await check_ban_and_respond(interaction):
             return
-
-        await interaction.response.defer(ephemeral=False)
 
         if interaction.user == discordClient.user:
             return

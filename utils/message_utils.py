@@ -1,23 +1,22 @@
-from discord import Message, Interaction
+from discord import Message
 import re
 
 async def send_split_message(self, response: str, message):
     char_limit = 1900
 
-    async def send_chunks(chunk: str, lang: str, channel):
-        if lang:
-            await channel.send(f"```{lang}\n{chunk}```")
-        else:
-            await channel.send(chunk)
-
     if hasattr(message, 'followup'):
-        channel = message.channel
         send_method = message.followup.send
     elif hasattr(message, 'channel'):
-        channel = message.channel
         send_method = message.channel.send
     else:
         raise AttributeError("send_split_message: Неподдерживаемый тип объекта для отправки сообщения")
+
+    async def send_chunks(chunk: str, lang: str):
+        if lang:
+            formatted_chunk = f"```{lang}\n{chunk}```"
+        else:
+            formatted_chunk = chunk
+        await send_method(formatted_chunk)
 
     if len(response) > char_limit:
         parts = re.split(r"(```(?:[a-zA-Z]+)?\n?)", response)
@@ -32,19 +31,10 @@ async def send_split_message(self, response: str, message):
                 continue
 
             chunks = [part[i:i + char_limit] for i in range(0, len(part), char_limit)]
-
-            for j, chunk in enumerate(chunks):
-                if is_code_block:
-                    if j == 0:
-                        await send_chunks(chunk, lang, channel)
-                    else:
-                        await send_chunks(chunk, lang, channel)
-                else:
-                    await send_chunks(chunk, "", channel)
-
+            for chunk in chunks:
+                await send_chunks(chunk, lang)
             is_code_block = False
             lang = ""
     else:
-        await channel.send(response)
-
+        await send_method(response)
     return
