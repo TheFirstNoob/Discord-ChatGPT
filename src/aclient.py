@@ -27,7 +27,7 @@ from g4f.Provider import (
     DDG,
     DarkAI,
     DeepInfraChat, # Request AUTH (har/cookies)
-    #DeepSeek,  # Request api
+    #DeepSeek,  # Request api/g4f need add non api endpoint
     Free2GPT,
     #FreeGpt,    # China lang only
     GizAI,
@@ -38,7 +38,7 @@ from g4f.Provider import (
     #Reka,  # Cloudflare detected
     #PerplexityLabs,    # Unknown error
     HuggingChat,    # Request AUTH (har/cookies)
-    HuggingSpace,    # Request AUTH (har/cookies)
+    HuggingSpace,
     #Jmuz,  # g4f error
     #Mhystical, # Cloudflare detected
     #RubiksAI, # Cloudflare detected
@@ -55,11 +55,13 @@ from utils.files_utils import read_json, write_json
 from utils.reminder_utils import check_reminders
 from utils.internet_utils import search_web, get_website_info, prepare_search_results
 from utils.internet_instructions_utils import get_web_search_instruction, get_image_search_instruction, get_video_search_instruction
+import aiofiles
 
 # const
 SYSTEM_DATA_FILE = 'system.json'
 USER_DATA_DIR = 'user_data'
 REMINDERS_DIR = 'reminders'
+SYSTEM_INSTRUCTION_FILE = "system_prompt.txt"
 
 load_dotenv()
 client = AsyncClient()
@@ -150,6 +152,7 @@ class DiscordClient(discord.Client):
         self.providers_dict = _initialize_providers()
         self.default_model = os.getenv("MODEL", "gpt-4o")
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
+        self.apply_instruction_to_all = os.getenv("APPLY_INSTRUCTION_TO_ALL", "False").lower() == "true"
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
         self.reminder_task = None
 
@@ -159,18 +162,21 @@ class DiscordClient(discord.Client):
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
 
-        config_dir = os.path.abspath(f"{__file__}/../../")
-        prompt_name = 'system_prompt.txt'
-        prompt_path = os.path.join(config_dir, prompt_name)
-
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            self.starting_prompt = f.read()
-
         self.message_queue = asyncio.Queue()
         
     async def setup_hook(self):
         if not hasattr(self, 'reminder_task') or self.reminder_task is None:
             self.reminder_task = asyncio.create_task(check_reminders(self))
+
+        # code below will be remove after next update
+        for filename in os.listdir(USER_DATA_DIR):
+            if filename.endswith('.json'):
+                try:
+                    user_id = filename.replace('.json', '') if filename != SYSTEM_DATA_FILE else None
+                    user_id = int(user_id) if user_id and user_id.isdigit() else None
+                    await self.load_user_data(user_id)
+                except Exception as e:
+                    logger.error(f"Ошибка при обновлении файла {filename}: {e}")
 
     async def check_user_ban(self, user_id):
         is_banned, reason = await ban_manager.is_user_banned(user_id)
@@ -187,7 +193,7 @@ class DiscordClient(discord.Client):
                 ban_time = datetime.fromisoformat(ban_data['timestamp'])
                 duration = timedelta(**ban_data['duration'])
                 unban_date = (ban_time + duration).strftime('%Y-%m-%d %H:%M:%S')
-                unban_text = f"Дата разблокировки: {unban_date}"
+                unban_text = f"Дата разблокировки: {unban_text}"
 
             return True, f":x: Вам заблокирован доступ к использованию этим ботом!\n**Причина**: {reason}\n{unban_text}"
 
@@ -264,10 +270,6 @@ class DiscordClient(discord.Client):
                 logger.warning("send_start_prompt: DISCORD_CHANNEL_ID не установлен в .env файле")
                 return
                 
-            if not self.starting_prompt:
-                logger.warning("send_start_prompt: Системные инструкции не установлены")
-                return
-
             await self.wait_until_ready()
             
             channel = self.get_channel(int(discord_channel_id))
@@ -275,9 +277,12 @@ class DiscordClient(discord.Client):
                 logger.error(f"send_start_prompt: Не удалось найти канал с ID {discord_channel_id}")
                 return
 
-            logger.info(f"Отправка системных инструкций для ИИ с размером (байтов): {len(self.starting_prompt)}")
+            user_data = await self.load_user_data(None)
+            starting_prompt = user_data.get('instruction', '')
 
-            response = await self.handle_response(None, self.starting_prompt)
+            logger.info(f"Отправка системных инструкций для ИИ с размером (байтов): {len(starting_prompt)}")
+
+            response = await self.handle_response(None, starting_prompt)
             if response:
                 await channel.send(f"{response}")
                 logger.info("send_start_prompt: Ответ от ИИ получен. Функция отработала корректно!")
@@ -299,10 +304,17 @@ class DiscordClient(discord.Client):
             user_data = await self.load_user_data(user_id)
             conversation_history = user_data.get('history', [])
             user_model = user_data.get('model', self.default_model)
+            user_instruction = user_data.get('instruction', '')
+
             conversation_history.append({'role': 'user', 'content': user_message})
 
             if len(conversation_history) > self.max_history_length:
-                conversation_history = conversation_history[3:]
+                system_message = next((msg for msg in conversation_history if msg['role'] == 'system'), None)
+                
+                if system_message:
+                    conversation_history = [system_message] + conversation_history[-(self.max_history_length-1):]
+                else:
+                    conversation_history = conversation_history[-self.max_history_length:]
 
             if request_type:
                 try:
@@ -312,7 +324,7 @@ class DiscordClient(discord.Client):
                         conversation_history.append({'role': 'assistant', 'content': result})
                 
                 except Exception as search_error:
-                    logger.error(f"handle_respose: Ошибка при поиске: {search_error}")
+                    logger.error(f"handle_response: Ошибка при поиске: {search_error}")
                     conversation_history.append({
                         'role': 'system', 
                         'content': f"ОШИБКА ПРИ ПОИСКЕ: {str(search_error)}"
@@ -351,7 +363,13 @@ class DiscordClient(discord.Client):
             )
             bot_response = response.choices[0].message.content
             conversation_history.append({'role': 'assistant', 'content': bot_response})
-            await self.save_user_data(user_id, {'history': conversation_history, 'model': user_model})
+
+            await self.save_user_data(user_id, {
+                'history': conversation_history, 
+                'model': user_model, 
+                'instruction': user_instruction
+            })
+            
             return f"{model_response}\n\n{bot_response}"
         
         except Exception as global_error:
@@ -377,28 +395,73 @@ class DiscordClient(discord.Client):
         user_data['model'] = model_name
         await self.save_user_data(user_id, user_data)
 
-    async def get_user_data_filepath(self, user_id):
-        filename = SYSTEM_DATA_FILE if user_id is None else f'{user_id}.json'
-        return os.path.join(USER_DATA_DIR, filename)
-
     async def load_user_data(self, user_id):
-        if user_id in user_data_cache:
+        if user_id is not None and user_id in user_data_cache:
             return user_data_cache[user_id]
 
         filepath = await self.get_user_data_filepath(user_id)
         data = await read_json(filepath)
-        
-        if data:
+
+        if not data:
+            instruction = await self.load_instruction_from_file(SYSTEM_INSTRUCTION_FILE) if self.apply_instruction_to_all or user_id is None else ""
+            data = {
+                'history': [{'role': 'system', 'content': instruction}] if instruction else [], 
+                'model': self.default_model, 
+                'instruction': instruction
+            }
+            await self.save_user_data(user_id, data)
+            logger.info(f"load_user_data: Создан новый файл данных {filepath} (user_id: {user_id})")
+
+        if data.get('instruction') and not any(msg['role'] == 'system' for msg in data.get('history', [])):
+            data['history'].insert(0, {'role': 'system', 'content': data['instruction']})
+            await self.save_user_data(user_id, data)
+
+        if user_id is not None:
             user_data_cache[user_id] = data
-            return data
-        else:
-            initial_data = {'history': [], 'model': self.default_model}
-            await self.save_user_data(user_id, initial_data)
-            return initial_data
+        return data
 
     async def save_user_data(self, user_id, data):
         filepath = await self.get_user_data_filepath(user_id)
         await write_json(filepath, data)
         user_data_cache[user_id] = data
+        
+    async def set_user_instruction(self, user_id: int, instruction: str):
+        user_data = await self.load_user_data(user_id)
+        user_data['history'] = [
+            msg for msg in user_data.get('history', []) 
+            if msg['role'] not in ['system']
+        ]
+
+        if instruction:
+            user_data['history'].insert(0, {'role': 'system', 'content': instruction})
+
+        user_data['instruction'] = instruction
+        await self.save_user_data(user_id, user_data)
+
+    async def reset_user_instruction(self, user_id: int):
+        user_data = await self.load_user_data(user_id)
+        user_data['history'] = [
+            msg for msg in user_data.get('history', []) 
+            if msg['role'] not in ['system']
+        ]
+        user_data['instruction'] = ""
+        await self.save_user_data(user_id, user_data)
+
+    async def get_user_data_filepath(self, user_id):
+        filename = SYSTEM_DATA_FILE if user_id is None else f'{user_id}.json'
+        filepath = os.path.join(USER_DATA_DIR, filename)
+        return filepath
+
+    async def load_instruction_from_file(self, filepath):
+        try:
+            async with aiofiles.open(filepath, mode='r', encoding='utf-8') as f:
+                instruction = await f.read()
+            return instruction
+        except FileNotFoundError:
+            print(f"load_instruction_from_file: Файл инструкций не найден: {filepath}")
+            return ""
+        except Exception as e:
+            print(f"load_instruction_from_file: Ошибка чтения файла инстукций: {e}")
+            return ""
 
 discordClient = DiscordClient()

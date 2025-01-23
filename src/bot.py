@@ -203,16 +203,35 @@ async def run_discord_bot():
 
         await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
+        
+    @discordClient.tree.command(name="instruction-set", description="Установить инструкцию для ИИ")
+    @app_commands.describe(instruction="Инструкция для ИИ")
+    async def instruction_set(interaction: discord.Interaction, instruction: str):
+        await interaction.response.defer(ephemeral=True)
+        user_id = interaction.user.id
+        await discordClient.set_user_instruction(user_id, instruction)
+        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Инструкция установлена!")
+        logger.info(f"Пользователь {interaction.user} установил инструкцию.")
+        
+    @discordClient.tree.command(name="instruction-reset", description="Сбросить инструкцию для ИИ")
+    async def instruction_reset(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        user_id = interaction.user.id
+        await discordClient.reset_user_instruction(user_id)
+        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Инструкция сброшена!")
+        logger.info(f"Пользователь {interaction.user} сбросил инструкцию.")
 
-    @discordClient.tree.command(name="reset", description="Сброс истории запросов")
+
+    @discordClient.tree.command(name="reset", description="Сброс всех параметров и истории диалога")
     async def reset(
         interaction: discord.Interaction
     ):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         await discordClient.reset_conversation_history(user_id)
-        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Ваша история и модели ИИ сброшены!")
-        logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю.\x1b[0m")
+        await discordClient.reset_user_instruction(user_id)
+        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Ваша история и параметры ИИ сброшены!")
+        logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю и параметры ИИ.\x1b[0m")
 
     @discordClient.tree.command(name="help", description="Информация как пользоваться ботом")
     async def help_command(interaction: discord.Interaction):
