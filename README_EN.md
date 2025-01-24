@@ -76,7 +76,6 @@
    </summary>
    	
 - **Streaming Message Optimization**: Further optimize the `utils/message_split` function for improved performance in streaming messages.
-- **Multiple Image Generation**: Support the generation of up to 4 images for `/draw` commands.
 - **Enhanced Web Search**: Improve web search capabilities for images and videos. Transform user messages to enhance search accuracy and implement language detection for optimal results.
 		
    > **Example User Request**: "I want to learn basic C++" (with request_type = videos)
