@@ -16,30 +16,30 @@ from g4f.client import AsyncClient
 from g4f.Provider import (
     #AmigoChat, # Quota limits
     #AutonomousAI,  # g4f error
-    #Anthropic, # RU region blocked
+    #Anthropic,
     Blackbox,
     CablyAI,
     ChatGLM,
-    ChatGptEs,
-    ChatGptt, # 10-30+ sec for response
+    #ChatGptEs, # data error
+    #ChatGptt, # 10-30+ sec for response SSL Error
     #Cerebras,  # Cloudflare detected
     DDG,
     DarkAI,
-    DeepInfraChat,
+    #DeepInfraChat, # Timeout error idk why :c
     #DeepSeek,  # Request api/g4f need add non api endpoint
-    Free2GPT,
+    #Free2GPT,  # Old models
     #FreeGpt,    # China lang only
     GizAI,
-    OpenaiChat, # experimental
+    OpenaiChat, # Experimental
     #GlhfChat, # Request api
     #Groq,  # Cloudflare detected
-    TeachAnything,
+    #TeachAnything, # Old models
     PollinationsAI,
     #Reka,  # Cloudflare detected
     #PerplexityLabs,    # Unknown error
     HuggingChat,    # Request AUTH (har/cookies)
     HuggingSpace,
-    #Jmuz,  # g4f error
+    #Jmuz,  # RU region block
     #Mhystical, # Cloudflare detected
     #RubiksAI, # Cloudflare detected
 
@@ -146,26 +146,24 @@ def _initialize_providers():
     }
 
     providers_dict = {
-        "gpt-4o-mini": [DDG, ChatGptEs, ChatGptt],
-        "gpt-4o": [Blackbox, PollinationsAI, DarkAI, ChatGptEs, ChatGptt],
-        "claude-3-haiku": [DDG],
+        "gpt-4o-mini": [DDG],
+        "gpt-4o": [Blackbox, PollinationsAI, DarkAI],
         "claude-3.5-sonnet": [Blackbox, PollinationsAI],
         "blackboxai": [Blackbox],
         "command-r-plus": [HuggingSpace, HuggingChat],
         "command-r7b-12-2024": [HuggingSpace],
         "gemini-1.5-flash": [Blackbox, GizAI],
         "gemini-1.5-pro": [Blackbox],
-        "llama-3.1-70b": [Blackbox, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
         "llama-3.2-11b": [HuggingChat],
-        "llama-3.3-70b": [Blackbox, HuggingChat, DeepInfraChat, PollinationsAI],
-        "qwq-32b": [Blackbox, HuggingChat, DeepInfraChat],
+        "llama-3.3-70b": [Blackbox, HuggingChat, PollinationsAI],
+        "qwq-32b": [Blackbox, HuggingChat],
         "qwen-qvq-72b-preview": [HuggingSpace],
-        "qwen-2-72b": [PollinationsAI, DeepInfraChat],
         "qwen-2.5-72b": [HuggingChat, HuggingSpace],
-        "qwen-2.5-coder-32b": [HuggingChat, DeepInfraChat, PollinationsAI],
-        "nemotron-70b": [HuggingChat, DeepInfraChat],
+        "qwen-2.5-coder-32b": [HuggingChat, PollinationsAI],
+        "nemotron-70b": [HuggingChat],
         "deepseek-chat": [Blackbox, PollinationsAI],
+        "deepseek-r1": [Blackbox, HuggingChat],
         "mixtral-8x7b": [DDG],
         "cably-80b": [CablyAI],
         "glm-4": [ChatGLM],
@@ -354,7 +352,7 @@ class DiscordClient(discord.Client):
             logger.error(f"send_start_prompt: Ошибка при конвертации ID канала: {e}")
         except Exception as e:
             logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
-            
+
     async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
         if user_id:
             is_banned, ban_message = await self.check_user_ban(user_id)
