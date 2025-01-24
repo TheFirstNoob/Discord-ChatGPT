@@ -18,7 +18,6 @@ from g4f.Provider import (
     #AutonomousAI,  # g4f error
     #Anthropic, # RU region blocked
     Blackbox,
-    BlackboxCreateAgent,
     CablyAI,
     ChatGLM,
     ChatGptEs,
@@ -26,11 +25,12 @@ from g4f.Provider import (
     #Cerebras,  # Cloudflare detected
     DDG,
     DarkAI,
-    DeepInfraChat, # Request AUTH (har/cookies)
+    DeepInfraChat,
     #DeepSeek,  # Request api/g4f need add non api endpoint
     Free2GPT,
     #FreeGpt,    # China lang only
     GizAI,
+    OpenaiChat, # experimental
     #GlhfChat, # Request api
     #Groq,  # Cloudflare detected
     TeachAnything,
@@ -45,6 +45,8 @@ from g4f.Provider import (
 
     RetryProvider
 )
+
+from g4f.models import __models__
 
 # local
 from src.locale_manager import locale_manager as lm  # For locale later
@@ -112,9 +114,38 @@ class RetryProvider:
         self.current_index = 0
 
 def _initialize_providers():
-    return {
-        # Chat providers
-        #"gpt-3.5-turbo": [DarkAI],
+    logger.info("_initialize_providers: Начало инициализации провайдеров...")
+
+    """
+    ⚠️ EXPERIMENTAL CODE WARNING FOR API REALISE ⚠️
+
+    This implementation is in an early experimental stage.
+    - May contain significant bugs
+    - Not recommended for production use
+    - Requires further testing and refinement
+
+
+    🤝 COMMUNITY HELP WANTED 🤝
+
+    If you are an experienced developer and can help improve this implementation, 
+    I would be extremely grateful! 
+
+    Suggestions, code reviews, and collaborative improvements are welcome.
+    Please feel free to contact me or submit improvements via GitHub/other platforms.
+
+    Your expertise could help make this code more robust and reliable.
+    """
+    api_providers = {
+        "Groq": os.getenv("GROQ_API_KEY"),
+        #"Anthropic": os.getenv("ANTHROPIC_API_KEY"),    # import error :c
+        "OpenaiChat": os.getenv("OPENAI_API_KEY"),
+        #"Gemini or GeminiPro": os.getenv("GOOGLE_API_KEY") or os.environ.get("G4F_LOGIN_URL")
+        "Perplexity": os.getenv("PERPLEXITY_API_KEY"),
+        "DeepInfra": os.getenv("DEEPINFRA_API_KEY"),
+        "HuggingFace": os.getenv("HUGGINGFACE_API_KEY")
+    }
+
+    providers_dict = {
         "gpt-4o-mini": [DDG, ChatGptEs, ChatGptt],
         "gpt-4o": [Blackbox, PollinationsAI, DarkAI, ChatGptEs, ChatGptt],
         "claude-3-haiku": [DDG],
@@ -122,10 +153,9 @@ def _initialize_providers():
         "blackboxai": [Blackbox],
         "command-r-plus": [HuggingSpace, HuggingChat],
         "command-r7b-12-2024": [HuggingSpace],
-        #"blackboxai-pro": [Blackbox],
         "gemini-1.5-flash": [Blackbox, GizAI],
         "gemini-1.5-pro": [Blackbox],
-        "llama-3.1-70b": [Blackbox, BlackboxCreateAgent, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, DDG, DarkAI],
+        "llama-3.1-70b": [Blackbox, DeepInfraChat, PollinationsAI, TeachAnything, Free2GPT, DDG, DarkAI],
         "llama-3.1-405b": [Blackbox],
         "llama-3.2-11b": [HuggingChat],
         "llama-3.3-70b": [Blackbox, HuggingChat, DeepInfraChat, PollinationsAI],
@@ -134,7 +164,6 @@ def _initialize_providers():
         "qwen-2-72b": [PollinationsAI, DeepInfraChat],
         "qwen-2.5-72b": [HuggingChat, HuggingSpace],
         "qwen-2.5-coder-32b": [HuggingChat, DeepInfraChat, PollinationsAI],
-        #"wizardlm-2-8x22b": [DeepInfraChat],
         "nemotron-70b": [HuggingChat, DeepInfraChat],
         "deepseek-chat": [Blackbox, PollinationsAI],
         "mixtral-8x7b": [DDG],
@@ -142,6 +171,38 @@ def _initialize_providers():
         "glm-4": [ChatGLM],
         "phi-3.5-mini": [HuggingChat],
     }
+
+    for provider_name, api_key in api_providers.items():
+        logger.info(f"_initialize_providers: Проверка провайдера: {provider_name}")
+
+        if not api_key or not api_key.strip():
+            logger.warning(f"{provider_name.upper()}_API_KEY не установлен. Пропуск.")
+            continue
+
+        if api_key.lower() == 'test':
+            logger.warning(f"_initialize_providers: Тестово добавлен провайдер {provider_name}. Код может работать нестабильно!")
+            
+        try:
+            provider_class = getattr(g4f.Provider, provider_name)
+            provider_added_to_models = []
+
+            for model_name in __models__:
+                if model_name in providers_dict:
+                    if provider_class in __models__[model_name][1]:
+                        if provider_class not in providers_dict[model_name]:
+                            providers_dict[model_name].insert(0, provider_class)
+                            provider_added_to_models.append(model_name)
+
+            if provider_added_to_models:
+                logger.info(f"_initialize_providers: API провайдер {provider_name} добавлен в модели: {provider_added_to_models}")
+        
+        except AttributeError:
+            logger.warning(f"_initialize_providers: Провайдер {provider_name} не найден в g4f.Provider")
+        except Exception as e:
+            logger.error(f"_initialize_providers: Ошибка при добавлении API провайдера {provider_name}: {e}")
+
+    logger.info("_initialize_providers: Инициализация провайдеров завершена")
+    return providers_dict
 
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
@@ -344,7 +405,21 @@ class DiscordClient(discord.Client):
                     logger.info(f"handle_response: Выбран провайдер: {current_provider}")
 
                     self.chatBot = AsyncClient(provider=current_provider)
-                    response = await self.chatBot.chat.completions.create(model=user_model, messages=conversation_history)
+
+                    if current_provider.__name__ == 'OpenaiChat':
+                        try:
+                            async for chunk in current_provider.login():
+                                if chunk is not None:
+                                    break
+                        except Exception as login_error:
+                            logger.error(f"handle_response: Ошибка авторизации OpenaiChat: {login_error}")
+                            continue
+
+                    response = await self.chatBot.chat.completions.create(
+                        model=user_model, 
+                        messages=conversation_history,
+                        provider=current_provider
+                    )
                     break
                 
                 except Exception as e:
