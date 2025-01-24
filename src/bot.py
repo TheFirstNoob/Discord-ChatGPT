@@ -329,42 +329,57 @@ async def run_discord_bot():
         prompt: str, 
         image_model: str, 
         model_name: str, 
-        client_type: str = 'default'
+        client_type: str = 'default',
+        count: int = 1
     ):
         try:
             await interaction.response.defer()
 
-            if client_type == 'prodia':
-                prodia_client = AsyncClient(image_provider=Prodia)
-                response = await prodia_client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
+            images_data = []
+            for _ in range(count):
+                if client_type == 'prodia':
+                    prodia_client = AsyncClient(image_provider=Prodia)
+                    response = await prodia_client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
+                else:
+                    response = await client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
+
+                if response.data:
+                    base64_text = response.data[0].b64_json
+                    image_data = base64.b64decode(base64_text)
+                    image_path = f"temp_image_{interaction.user.id}_{len(images_data)}.png"
+
+                    with open(image_path, 'wb') as f:
+                        f.write(image_data)
+
+                    images_data.append(image_path)
+                else:
+                    await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение. Ответ не содержит данных.")
+                    logger.error(f"generate_and_send_image: Не удалось сгенерировать изображение. Ответ не содержит данных.")
+
+            if images_data:
+                if count > 1:
+                    files = [discord.File(image_path, filename=f"image_{i+1}.png") for i, image_path in enumerate(images_data)]
+                    model_message = f":paintbrush: **Изображения от модели**: {model_name}"
+                    await interaction.followup.send(model_message, files=files)
+                else:
+                    with open(images_data[0], 'rb') as f:
+                        model_message = f":paintbrush: **Изображение от модели**: {model_name}"
+                        await interaction.followup.send(model_message, file=discord.File(f, filename=images_data[0]))
+                for image_path in images_data:
+                    os.remove(image_path)
             else:
-                response = await client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
-
-            if response.data:
-                base64_text = response.data[0].b64_json
-                image_data = base64.b64decode(base64_text)
-                image_path = f"temp_image_{interaction.user.id}.png"
-
-                with open(image_path, 'wb') as f:
-                    f.write(image_data)
-
-                with open(image_path, 'rb') as f:
-                    model_message = f":paintbrush: **Изображение от модели**: {model_name}"
-                    await interaction.followup.send(model_message, file=discord.File(f, filename=image_path))
-
-                os.remove(image_path)
-            else:
-                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение.")
-                logger.error(f"draw: Не удалось сгенерировать изображение. Ответ не содержит данных.")
+                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать ни одного изображения.")
+                logger.error(f"generate_and_send_image: Не удалось сгенерировать изображения.")
 
         except Exception as e:
-            logger.error(f"draw: Ошибка при выполнении команды: {str(e)}")
+            logger.error(f"generate_and_send_image: Ошибка при выполнении: {str(e)}")
             await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
 
     @discordClient.tree.command(name="draw", description="Сгенерировать изображение от модели ИИ")
     @app_commands.describe(
         prompt="Введите ваш запрос (На Английском языке)",
-        image_model="Выберите модель для генерации изображения"
+        image_model="Выберите модель для генерации изображения",
+        count="Количество изображений для генерации"
     )
     @app_commands.choices(image_model=[
         app_commands.Choice(name="Stable Diffusion XL", value="sdxl"),
@@ -381,10 +396,17 @@ async def run_discord_bot():
         app_commands.Choice(name="Dall-E V3", value="dall-e-3"),
         app_commands.Choice(name="Any Dark", value="any-dark"),
     ])
+    @app_commands.choices(count=[
+        app_commands.Choice(name="1", value=1),
+        app_commands.Choice(name="2", value=2),
+        app_commands.Choice(name="3", value=3),
+        app_commands.Choice(name="4", value=4),
+    ])
     async def draw(
         interaction: discord.Interaction,
         prompt: str,
-        image_model: app_commands.Choice[str]
+        image_model: app_commands.Choice[str],
+        count: Optional[int] = 1
     ):
         if await check_ban_and_respond(interaction):
             return
@@ -394,14 +416,21 @@ async def run_discord_bot():
 
         username = str(interaction.user)
         channel = str(interaction.channel)
-        logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{image_model.value}]")
+        logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{image_model.value}] Кол-во: [{count}]")
 
-        await generate_and_send_image(interaction, prompt, image_model.value, image_model.name)
+        await generate_and_send_image(
+            interaction, 
+            prompt, 
+            image_model.value, 
+            image_model.name,
+            count=count
+        )
 
     @discordClient.tree.command(name="draw-prodia", description="Сгенерировать изображение от модели ИИ с использованием Prodia")
     @app_commands.describe(
         prompt="Введите ваш запрос (На Английском языке)",
-        image_model="Выберите модель для генерации изображения"
+        image_model="Выберите модель для генерации изображения",
+        count="Количество изображений для генерации"
     )
     @app_commands.choices(image_model=[
         app_commands.Choice(name="3 Guofeng3 v3.4", value="3Guofeng3_v34.safetensors [50f420de]"),
@@ -430,10 +459,17 @@ async def run_discord_bot():
         app_commands.Choice(name="Pastel Mix Stylized Anime", value="pastelMixStylizedAnime_pruned_fp16.safetensors [793a26e8]"),
         app_commands.Choice(name="Realistic Vision V5.1", value="Realistic_Vision_V5.1.safetensors [a0f13c83]"),
     ])
+    @app_commands.choices(count=[
+        app_commands.Choice(name="1", value=1),
+        app_commands.Choice(name="2", value=2),
+        app_commands.Choice(name="3", value=3),
+        app_commands.Choice(name="4", value=4),
+    ])
     async def draw_prodia(
         interaction: discord.Interaction,
         prompt: str,
-        image_model: app_commands.Choice[str]
+        image_model: app_commands.Choice[str],
+        count: Optional[int] = 1
     ):
         if await check_ban_and_respond(interaction):
             return
@@ -443,14 +479,15 @@ async def run_discord_bot():
 
         username = str(interaction.user)
         channel = str(interaction.channel)
-        logger.info(f"\x1b[31m{username}\x1b[0m : /draw-prodia [{prompt}] в ({channel}) через [{image_model.name}]")
+        logger.info(f"\x1b[31m{username}\x1b[0m : /draw-prodia [{prompt}] в ({channel}) через [{image_model.name}] Кол-во: [{count}]")
 
         await generate_and_send_image(
             interaction, 
             prompt, 
             image_model.value, 
             image_model.name, 
-            client_type='prodia'
+            client_type='prodia',
+            count=count
         )
 
     @discordClient.tree.command(name="remind-add", description="Создать напоминание")
@@ -569,7 +606,7 @@ async def run_discord_bot():
             logger.info(f"Пользователь {user_id} успешно забанен администратором {interaction.user.id}")
             await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно забанен**")
         except Exception as e:
-            logger.error(f"Ошибка при бане пользователя {user_id}: {e}")
+            logger.error(f"ban_user Ошибка при бане пользователя {user_id}: {e}")
             await interaction.followup.send(f"> :x: **Произошла ошибка при бане: {e}**")
 
     @discordClient.tree.command(name="unban", description="Разбанить пользователя")
@@ -596,7 +633,7 @@ async def run_discord_bot():
             else:
                 await interaction.followup.send(f"> :warning: **Пользователь {user_id} не был забанен**")
         except Exception as e:
-            logger.error(f"Ошибка при разбане пользователя {user_id}: {e}")
+            logger.error(f"unban_user: Ошибка при разбане пользователя {user_id}: {e}")
             await interaction.followup.send(f"> :x: **Произошла ошибка при разбане: {e}**")
 
     @discordClient.tree.command(name="banned-list", description="Список забаненных пользователей")
