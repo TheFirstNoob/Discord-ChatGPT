@@ -25,10 +25,11 @@
 ## ⭐️ Features
 
 * 🧠 **AI Usage:** Most of the modified code is written with the help of ChatGPT and other AIs for experimentation.
-* 💬 **Multifunctionality:** The bot can communicate both in a Discord channel and in private messages.
+* 💬 **Multifunctionality:** The bot can communicate both in a Discord channel and in private messages. You can use both slash commands and @ mentions.
 * 🌐 **Internet Support:** The bot can perform search queries, find images, and videos using the **[duckduckgo-search](https://github.com/deedy5/duckduckgo_search)** library.
 * 📝 **Working with PDF:** The bot can analyze your PDF file for text content and interact with it using the **[pdfminer.six](https://github.com/pdfminer/pdfminer.six)** library. (Does not support images!)
 * 🔔 **Reminders:** The bot can remind you about important events such as Exams, sessions, Deadlines, and etc. Both current reminders and notifications about overdue reminds are supported.
+* 🔨 **Admin Tool:** The administrator can manage access to the bot for each user.
 
 ---
 
@@ -38,7 +39,7 @@
 
 * 🧠 **Extended AI models:** Support for more chat models and image generation models using the **[gpt4free](https://github.com/xtekky/gpt4free)** library.
 * 💾 **Individual memory:** Each user has their own "memory," resettable with the `/reset` command separately.
-* 📊 **Settings retention:** The AI model used is saved individually for each user.
+* 📊 **Set Models and Instructions:** The AI ​​model and instruction set used are saved individually for each user.
 * 📥 **Conversation history:** Ability to download the user's conversation history with the AI.
 
 ---
@@ -52,7 +53,6 @@
 
    </summary>
    
-- **Mention Support**: Enable users to interact with the bot using mentions (e.g., "@BotName hi") for more personalized responses.
 - **Streaming Message Support**: Implement a Discord edit function for streaming messages, ensuring proper chunk splitting.
 	> - Introduce a `/settings` command for users to customize their parameters.
 	> - Enforce a minimum delay of 1 second between messages to prevent spam.
@@ -64,7 +64,6 @@
 - **DeepL Integration**: Incorporate the DeepL Engine for advanced translation capabilities.
 - **Enhanced Discord UI**: Improve the user interface with features like Ember messages and interactive buttons (e.g., "Regenerate").
 - **Database Integration**: Utilize MySQL/NoSQL or another database to store user messages based on configuration settings.
-- **User  Memory**: Implement permanent memory for each user to save custom instructions and preferences.
 - **New Services and Products**: Explore integration of additional services and products to expand functionality.
   
 </details>
@@ -75,22 +74,7 @@
    ### Improvements for the Bot
 
    </summary>
-   
-- **Message Splitting Enhancement**: Refine the `utils/message_split` function to ensure accurate code highlighting. After splitting code into chunks, the appropriate language markers (e.g., ```cpp) should be applied.
-
-    > **Example User Prompt**: C++ Snake Game
-    > 
-    > **Bot Response**: 
-   > - **1st Chunk**:  
-   >    ^^^cpp  
-   >          Code for Snake game here, part 1  
-	>    ^^^# End of chunk 1  
-	> 	
-   > - **2nd Chunk**:  
-   >    ^^^ # Missing cpp marking on start of chunk 2!  
-	> 		   Code for Snake game here, part 2  
-	>    ^^^  
-		
+   	
 - **Streaming Message Optimization**: Further optimize the `utils/message_split` function for improved performance in streaming messages.
 - **Multiple Image Generation**: Support the generation of up to 4 images for `/draw` commands.
 - **Enhanced Web Search**: Improve web search capabilities for images and videos. Transform user messages to enhance search accuracy and implement language detection for optimal results.
@@ -118,7 +102,7 @@
 
 ## 🛠️ Installation
 
-* **Python 3.9 or later**
+* **Python 3.10 or later**
 * **Rename the `.env.example` file to `.env`**
 * In the Windows terminal, run `pip3 install -r requirements.txt` or `pip install -r requirements.txt` to install all required libraries
 
@@ -189,9 +173,22 @@
 | `/remind-list`    | Show your reminds list     |
 | `/remind-delete`  | Delete remind (with Index) |
 
+### Instuctions
+| Command               | Description           |
+|-----------------------|-----------------------|
+| `/instruction-set`    | Set AI instuction 	|
+| `/instruction-reset ` | Reset AI instuction   |
+
+### Admin Tool
+| Command         | Description                        |
+|-----------------|------------------------------------|
+| `/ban`     	  | Block access to the bot for user   |
+| `/unban`    	  | Unblock access to the bot for user |
+| `/banned-list ` | List banned users  		       |
+
 ### Management
-| Command        			| Description                                  	|
-|---------------------------|-----------------------------------------------|
-| `/reset`       			| Reset conversation history                 	|
-| `/chat-model` 			| Switch chat model                          	|
-| `/history`     			| Download conversation history              	|
+| Command        	| Description                       |
+|-----------------------|-----------------------------------|
+| `/reset`       	| Reset conversation history        |
+| `/chat-model` 	| Switch chat model                 |
+| `/history`     	| Download conversation history     |
