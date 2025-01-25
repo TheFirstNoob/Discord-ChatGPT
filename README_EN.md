@@ -30,6 +30,7 @@
 * 📝 **Working with PDF:** The bot can analyze your PDF file for text content and interact with it using the **[pdfminer.six](https://github.com/pdfminer/pdfminer.six)** library. (Does not support images!)
 * 🔔 **Reminders:** The bot can remind you about important events such as Exams, sessions, Deadlines, and etc. Both current reminders and notifications about overdue reminds are supported.
 * 🔨 **Admin Tool:** The administrator can manage access to the bot for each user.
+* 🔑 **Encryption Support: Advanced data protection using Fernet encryption, ensuring confidentiality of user interactions and personal data.
 
 ---
 
