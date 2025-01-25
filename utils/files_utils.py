@@ -1,6 +1,7 @@
 import aiofiles
 import json
 import os
+from src.log import logger
 
 async def read_file(filepath):
     if os.path.exists(filepath):

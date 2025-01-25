@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
