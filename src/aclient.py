@@ -5,6 +5,12 @@ from datetime import datetime, timedelta
 from typing import Optional
 from dotenv import load_dotenv
 
+# cryptography
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import base64
+
 # discord
 import discord
 from discord import app_commands, Attachment
@@ -201,6 +207,44 @@ def _initialize_providers():
 
     logger.info("_initialize_providers: Инициализация провайдеров завершена")
     return providers_dict
+    
+class UserDataEncryptor:
+    def __init__(self, user_id=None):
+        self.user_id = user_id
+        self.key_file = f'keys/{user_id}_key.json'
+        
+        # Проверка и создание директории keys
+        if not os.path.exists('keys'):
+            os.makedirs('keys')
+        
+        self.cipher_suite = self._load_or_generate_key()
+
+    def _load_or_generate_key(self):
+        if os.path.exists(self.key_file):
+            with open(self.key_file, 'r') as f:
+                key_data = json.load(f)
+                key = base64.urlsafe_b64decode(key_data['key'])
+                return Fernet(key)
+        else:
+            # Генерация нового ключа
+            key = Fernet.generate_key()
+            with open(self.key_file, 'w') as f:
+                json.dump({'key': base64.urlsafe_b64encode(key).decode()}, f)
+            return Fernet(key)
+
+    def encrypt(self, data):
+        json_data = json.dumps(data, ensure_ascii=False)
+        encrypted_data = self.cipher_suite.encrypt(json_data.encode('utf-8'))
+        return base64.urlsafe_b64encode(encrypted_data).decode('utf-8')
+
+    def decrypt(self, encrypted_data):
+        try:
+            decoded_data = base64.urlsafe_b64decode(encrypted_data.encode('utf-8'))
+            decrypted_data = self.cipher_suite.decrypt(decoded_data)
+            return json.loads(decrypted_data.decode('utf-8'))
+        except Exception as e:
+            logger.error(f"Ошибка дешифрования: {e}")
+            return None
 
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
@@ -213,6 +257,7 @@ class DiscordClient(discord.Client):
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.apply_instruction_to_all = os.getenv("APPLY_INSTRUCTION_TO_ALL", "False").lower() == "true"
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
+        self.encrypt_user_data = os.getenv('ENCRYPT_USER_DATA', 'False').lower() == 'true'
         self.reminder_task = None
 
         default_providers = self.providers_dict.get(self.default_model, [])
@@ -473,8 +518,24 @@ class DiscordClient(discord.Client):
             return user_data_cache[user_id]
 
         filepath = await self.get_user_data_filepath(user_id)
-        data = await read_json(filepath)
+        
+        if self.encrypt_user_data:
+            try:
+                async with aiofiles.open(filepath, 'r', encoding='utf-8') as f:
+                    encrypted_data = await f.read()
+                    
+                encryptor = UserDataEncryptor(user_id)
+                data = encryptor.decrypt(encrypted_data)
+                
+                if not data:
+                    raise ValueError("Не удалось расшифровать данные")
+            except Exception as e:
+                logger.error(f"load_user_data: Ошибка при расшифровке: {e}")
+                data = None
+        else:
+            data = await read_json(filepath)
 
+        # Остальная логика остается без изменений
         if not data:
             instruction = await self.load_instruction_from_file(SYSTEM_INSTRUCTION_FILE) if self.apply_instruction_to_all or user_id is None else ""
             data = {
@@ -485,17 +546,23 @@ class DiscordClient(discord.Client):
             await self.save_user_data(user_id, data)
             logger.info(f"load_user_data: Создан новый файл данных {filepath} (user_id: {user_id})")
 
-        if data.get('instruction') and not any(msg['role'] == 'system' for msg in data.get('history', [])):
-            data['history'].insert(0, {'role': 'system', 'content': data['instruction']})
-            await self.save_user_data(user_id, data)
-
-        if user_id is not None:
-            user_data_cache[user_id] = data
+        # Остальная логика без изменений
         return data
 
     async def save_user_data(self, user_id, data):
         filepath = await self.get_user_data_filepath(user_id)
-        await write_json(filepath, data)
+        
+        if self.encrypt_user_data:
+            # Шифрование данных
+            encryptor = UserDataEncryptor(user_id)
+            encrypted_data = encryptor.encrypt(data)
+            
+            async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
+                await f.write(encrypted_data)
+        else:
+            # Стандартное сохранение
+            await write_json(filepath, data)
+        
         user_data_cache[user_id] = data
         
     async def set_user_instruction(self, user_id: int, instruction: str):

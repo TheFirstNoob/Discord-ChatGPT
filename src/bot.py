@@ -1,8 +1,10 @@
 import os
 import re
+import json
 import base64
 import asyncio
 import aiohttp
+import aiofiles
 import mimetypes
 
 import discord
@@ -309,16 +311,39 @@ async def run_discord_bot():
             return
 
         user_id = interaction.user.id
-        filepath = await discordClient.download_conversation_history(user_id)
-
-        if filepath:
-            with open(filepath, 'rb') as file:
-                await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Ваша история диалога:")
-                await interaction.followup.send(file=discord.File(file, filename=f'{user_id}_history.json'))
-        else:
-            await interaction.followup.send("> :x: **ОШИБКА:** История сообщений не найдена!")
+        
+        try:
+            # Загрузка данных с учетом возможного шифрования
+            user_data = await discordClient.load_user_data(user_id)
             
-        logger.info(f"\x1b[31m{username} запросил(а) историю сообщений с ботом\x1b[0m")
+            if not user_data or not user_data.get('history'):
+                await interaction.followup.send("> :x: **ОШИБКА:** История сообщений пуста!")
+                return
+
+            # Создаем временный файл с историей
+            temp_filepath = f'temp_history_{user_id}.json'
+            
+            async with aiofiles.open(temp_filepath, 'w', encoding='utf-8') as f:
+                await f.write(json.dumps(user_data, ensure_ascii=False, indent=4))
+            
+            try:
+                with open(temp_filepath, 'rb') as file:
+                    await interaction.followup.send(
+                        "> :white_check_mark: **УСПЕШНО:** Ваша история диалога:", 
+                        file=discord.File(file, filename=f'{user_id}_history.json')
+                    )
+            except Exception as e:
+                logger.error(f"history: Ошибка при отправке файла: {e}")
+                await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось отправить файл. {e}")
+            
+            # Удаляем временный файл
+            os.remove(temp_filepath)
+            
+            logger.info(f"\x1b[31m{username} запросил(а) историю сообщений с ботом\x1b[0m")
+        
+        except Exception as e:
+            logger.error(f"history: Критическая ошибка: {e}")
+            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось получить историю. {e}")
     
     async def generate_and_send_image(
         interaction: discord.Interaction, 
