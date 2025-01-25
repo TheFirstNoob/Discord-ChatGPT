@@ -5,12 +5,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 from dotenv import load_dotenv
 
-# cryptography
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import base64
-
 # discord
 import discord
 from discord import app_commands, Attachment
@@ -23,6 +17,7 @@ from g4f.Provider import (
     #AmigoChat, # Quota limits
     #AutonomousAI,  # g4f error
     #Anthropic,
+    AIChatFree,
     Blackbox,
     CablyAI,
     ChatGLM,
@@ -36,6 +31,7 @@ from g4f.Provider import (
     #Free2GPT,  # Old models
     #FreeGpt,    # China lang only
     GizAI,
+    GPROChat,
     OpenaiChat, # Experimental
     #GlhfChat, # Request api
     #Groq,  # Cloudflare detected
@@ -60,10 +56,10 @@ from src.log import logger
 from src.ban_manager import ban_manager
 from utils.message_utils import send_split_message
 from utils.files_utils import read_json, write_json
+from utils.encryption_utils import UserDataEncryptor
 from utils.reminder_utils import check_reminders
 from utils.internet_utils import search_web, get_website_info, prepare_search_results
 from utils.internet_instructions_utils import get_web_search_instruction, get_image_search_instruction, get_video_search_instruction
-import aiofiles
 
 # const
 SYSTEM_DATA_FILE = 'system.json'
@@ -159,13 +155,13 @@ def _initialize_providers():
         "command-r-plus": [HuggingSpace, HuggingChat],
         "command-r7b-12-2024": [HuggingSpace],
         "gemini-1.5-flash": [Blackbox, GizAI],
-        "gemini-1.5-pro": [Blackbox],
+        "gemini-1.5-pro": [Blackbox, GPROChat, AIChatFree],
         "llama-3.1-405b": [Blackbox],
         "llama-3.2-11b": [HuggingChat],
         "llama-3.3-70b": [Blackbox, HuggingChat, PollinationsAI],
         "qwq-32b": [Blackbox, HuggingChat],
         "qwen-qvq-72b-preview": [HuggingSpace],
-        "qwen-2.5-72b": [HuggingChat, HuggingSpace],
+        "qwen-2.5-72b": [HuggingChat],
         "qwen-2.5-coder-32b": [HuggingChat, PollinationsAI],
         "nemotron-70b": [HuggingChat],
         "deepseek-chat": [Blackbox, PollinationsAI],
@@ -207,44 +203,6 @@ def _initialize_providers():
 
     logger.info("_initialize_providers: Инициализация провайдеров завершена")
     return providers_dict
-    
-class UserDataEncryptor:
-    def __init__(self, user_id=None):
-        self.user_id = user_id
-        self.key_file = f'keys/{user_id}_key.json'
-        
-        # Проверка и создание директории keys
-        if not os.path.exists('keys'):
-            os.makedirs('keys')
-        
-        self.cipher_suite = self._load_or_generate_key()
-
-    def _load_or_generate_key(self):
-        if os.path.exists(self.key_file):
-            with open(self.key_file, 'r') as f:
-                key_data = json.load(f)
-                key = base64.urlsafe_b64decode(key_data['key'])
-                return Fernet(key)
-        else:
-            # Генерация нового ключа
-            key = Fernet.generate_key()
-            with open(self.key_file, 'w') as f:
-                json.dump({'key': base64.urlsafe_b64encode(key).decode()}, f)
-            return Fernet(key)
-
-    def encrypt(self, data):
-        json_data = json.dumps(data, ensure_ascii=False)
-        encrypted_data = self.cipher_suite.encrypt(json_data.encode('utf-8'))
-        return base64.urlsafe_b64encode(encrypted_data).decode('utf-8')
-
-    def decrypt(self, encrypted_data):
-        try:
-            decoded_data = base64.urlsafe_b64decode(encrypted_data.encode('utf-8'))
-            decrypted_data = self.cipher_suite.decrypt(decoded_data)
-            return json.loads(decrypted_data.decode('utf-8'))
-        except Exception as e:
-            logger.error(f"Ошибка дешифрования: {e}")
-            return None
 
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
@@ -448,16 +406,6 @@ class DiscordClient(discord.Client):
                     logger.info(f"handle_response: Выбран провайдер: {current_provider}")
 
                     self.chatBot = AsyncClient(provider=current_provider)
-
-                    if current_provider.__name__ == 'OpenaiChat':
-                        try:
-                            async for chunk in current_provider.login():
-                                if chunk is not None:
-                                    break
-                        except Exception as login_error:
-                            logger.error(f"handle_response: Ошибка авторизации OpenaiChat: {login_error}")
-                            continue
-
                     response = await self.chatBot.chat.completions.create(
                         model=user_model, 
                         messages=conversation_history,
@@ -521,48 +469,47 @@ class DiscordClient(discord.Client):
         
         if self.encrypt_user_data:
             try:
-                async with aiofiles.open(filepath, 'r', encoding='utf-8') as f:
-                    encrypted_data = await f.read()
-                    
-                encryptor = UserDataEncryptor(user_id)
-                data = encryptor.decrypt(encrypted_data)
+                encrypted_data = await read_file(filepath)
                 
+                if not encrypted_data:
+                    raise FileNotFoundError("load_user_data: Файл пуст")
+
+                encryptor = await UserDataEncryptor(user_id).initialize()
+                data = await encryptor.decrypt(encrypted_data)
+
                 if not data:
-                    raise ValueError("Не удалось расшифровать данные")
+                    raise ValueError("load_user_data: Не удалось расшифровать данные")
+
             except Exception as e:
                 logger.error(f"load_user_data: Ошибка при расшифровке: {e}")
                 data = None
         else:
             data = await read_json(filepath)
 
-        # Остальная логика остается без изменений
         if not data:
-            instruction = await self.load_instruction_from_file(SYSTEM_INSTRUCTION_FILE) if self.apply_instruction_to_all or user_id is None else ""
+            instruction = await self.load_instruction_from_file(SYSTEM_INSTRUCTION_FILE) \
+                if self.apply_instruction_to_all or user_id is None else ""
+            
             data = {
                 'history': [{'role': 'system', 'content': instruction}] if instruction else [], 
                 'model': self.default_model, 
                 'instruction': instruction
             }
+
             await self.save_user_data(user_id, data)
             logger.info(f"load_user_data: Создан новый файл данных {filepath} (user_id: {user_id})")
-
-        # Остальная логика без изменений
         return data
 
     async def save_user_data(self, user_id, data):
         filepath = await self.get_user_data_filepath(user_id)
         
         if self.encrypt_user_data:
-            # Шифрование данных
-            encryptor = UserDataEncryptor(user_id)
-            encrypted_data = encryptor.encrypt(data)
-            
-            async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
-                await f.write(encrypted_data)
+            encryptor = await UserDataEncryptor(user_id).initialize()
+            encrypted_data = await encryptor.encrypt(data)
+            await write_file(filepath, encrypted_data)
         else:
-            # Стандартное сохранение
             await write_json(filepath, data)
-        
+
         user_data_cache[user_id] = data
         
     async def set_user_instruction(self, user_id: int, instruction: str):
@@ -594,14 +541,13 @@ class DiscordClient(discord.Client):
 
     async def load_instruction_from_file(self, filepath):
         try:
-            async with aiofiles.open(filepath, mode='r', encoding='utf-8') as f:
-                instruction = await f.read()
-            return instruction
+            instruction = await read_file(filepath)
+            return instruction or ""
         except FileNotFoundError:
-            print(f"load_instruction_from_file: Файл инструкций не найден: {filepath}")
+            logger.warning(f"load_instruction_from_file: Файл инструкций не найден: {filepath}")
             return ""
         except Exception as e:
-            print(f"load_instruction_from_file: Ошибка чтения файла инстукций: {e}")
+            logger.error(f"load_instruction_from_file: Ошибка чтения файла инструкций: {e}")
             return ""
 
 discordClient = DiscordClient()
