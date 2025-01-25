@@ -55,7 +55,7 @@ from src.locale_manager import locale_manager as lm  # For locale later
 from src.log import logger
 from src.ban_manager import ban_manager
 from utils.message_utils import send_split_message
-from utils.files_utils import read_json, write_json
+from utils.files_utils import read_json, write_json, read_file, write_file
 from utils.encryption_utils import UserDataEncryptor
 from utils.reminder_utils import check_reminders
 from utils.internet_utils import search_web, get_website_info, prepare_search_results
