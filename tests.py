@@ -51,7 +51,7 @@ class ProviderChecker:
         for model in models:
             self.providers[model] = RetryProvider(models[model])
 
-    async def iterate_providers(self):
+    def iterate_providers(self):
         for model in self.providers:
             for provider in self.providers[model].providers:
                 yield model, provider
@@ -66,7 +66,7 @@ class ProviderChecker:
 
     async def check_provider_availability_parallel(self):
         tasks = []
-        async for model, provider in self.iterate_providers():
+        for model, provider in self.iterate_providers():
             task = asyncio.create_task(self.check_provider(model, provider))
             tasks.append(task)
             await asyncio.sleep(1)
@@ -74,7 +74,7 @@ class ProviderChecker:
         await asyncio.gather(*tasks)
 
     async def check_provider_availability_sequential(self):
-        async for model, provider in self.iterate_providers():
+        for model, provider in self.iterate_providers():
             await self.check_provider(model, provider)
 
     async def check_provider(self, model, provider):
