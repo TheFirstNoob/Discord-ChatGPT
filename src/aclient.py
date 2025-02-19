@@ -17,28 +17,31 @@ from g4f.Provider import (
     #AmigoChat, # Quota limits
     #AutonomousAI,  # g4f error
     #Anthropic,
-    AIChatFree,
-    Blackbox,
+    #AIChatFree,
+    Blackbox,  # Now request payment for other models :c
+    BlackboxAPI,
     CablyAI,
     ChatGLM,
     #ChatGptEs, # data error
     #ChatGptt, # 10-30+ sec for response SSL Error
     #Cerebras,  # Cloudflare detected
     DDG,
-    DarkAI,
-    #DeepInfraChat, # Timeout error idk why :c
+    #DarkAI,    # Disabled in G4F SSL error
+    #DeepInfraChat, # Return auth error but+ we auth
     #DeepSeek,  # Request api/g4f need add non api endpoint
     #Free2GPT,  # Old models
     #FreeGpt,    # China lang only
     GizAI,
-    GPROChat,
+    Glider,
+    #GPROChat,
     OpenaiChat, # Experimental
+    #OIVSCode, # 503 HTML Error
     #GlhfChat, # Request api
     #Groq,  # Cloudflare detected
     #TeachAnything, # Old models
     PollinationsAI,
     #Reka,  # Cloudflare detected
-    #PerplexityLabs,    # Unknown error
+    #PerplexityLabs,    # Cloudflare detected
     HuggingChat,    # Request AUTH (har/cookies)
     HuggingSpace,
     #Jmuz,  # RU region block
@@ -148,26 +151,31 @@ def _initialize_providers():
     }
 
     providers_dict = {
-        "gpt-4o-mini": [DDG],
-        "gpt-4o": [Blackbox, PollinationsAI, DarkAI],
-        "claude-3.5-sonnet": [Blackbox, PollinationsAI],
+        "gpt-4o-mini": [DDG, CablyAI, PollinationsAI],
+        "gpt-4o": [PollinationsAI],
+        "o3-mini-low": [CablyAI, PollinationsAI],
+        "o3-mini": [DDG],
+        #"claude-3.5-sonnet": [Blackbox],
         "blackboxai": [Blackbox],
         "command-r-plus": [HuggingSpace, HuggingChat],
         "command-r7b-12-2024": [HuggingSpace],
-        "gemini-1.5-flash": [Blackbox, GizAI],
-        "gemini-1.5-pro": [Blackbox, GPROChat, AIChatFree],
+        "gemini-1.5-flash": [GizAI, Blackbox],
+        #"gemini-1.5-pro": [Blackbox],
+        "gemini-2.0-flash": [Blackbox, PollinationsAI],
+        "gemini-2.0-flash-thinking": [PollinationsAI],
         "llama-3.1-405b": [Blackbox],
         "llama-3.2-11b": [HuggingChat],
-        "llama-3.3-70b": [Blackbox, HuggingChat, PollinationsAI],
-        "qwq-32b": [Blackbox, HuggingChat],
+        "llama-3.3-70b": [HuggingChat, PollinationsAI, Blackbox],
+        "qwq-32b": [HuggingChat, Blackbox],
         "qwen-qvq-72b-preview": [HuggingSpace],
         "qwen-2.5-72b": [HuggingChat],
         "qwen-2.5-coder-32b": [HuggingChat, PollinationsAI],
         "nemotron-70b": [HuggingChat],
-        "deepseek-chat": [Blackbox, PollinationsAI],
-        "deepseek-r1": [Blackbox, HuggingChat],
+        "deepseek-chat": [PollinationsAI],
+        "deepseek-v3": [Blackbox],
+        "deepseek-r1": [BlackboxAPI, Blackbox, HuggingChat, Glider],
         "mixtral-8x7b": [DDG],
-        "cably-80b": [CablyAI],
+        #"cably-80b": [CablyAI],
         "glm-4": [ChatGLM],
         "phi-3.5-mini": [HuggingChat],
     }
@@ -230,16 +238,6 @@ class DiscordClient(discord.Client):
         if not hasattr(self, 'reminder_task') or self.reminder_task is None:
             self.reminder_task = asyncio.create_task(check_reminders(self))
 
-        # code below will be remove after next update
-        for filename in os.listdir(USER_DATA_DIR):
-            if filename.endswith('.json'):
-                try:
-                    user_id = filename.replace('.json', '') if filename != SYSTEM_DATA_FILE else None
-                    user_id = int(user_id) if user_id and user_id.isdigit() else None
-                    await self.load_user_data(user_id)
-                except Exception as e:
-                    logger.error(f"Ошибка при обновлении файла {filename}: {e}")
-
     async def check_user_ban(self, user_id):
         is_banned, reason = await ban_manager.is_user_banned(user_id)
         
@@ -274,16 +272,21 @@ class DiscordClient(discord.Client):
                     await asyncio.gather(*tasks)
             await asyncio.sleep(1)
             
-    async def process_request(self, query, request_type="search"):
+    async def process_request(self, query, user_id: int, request_type="search"):
+        self.user_id = user_id
         try:
             results = await search_web(query, request_type)
             
             if request_type == 'search':
-                conversation_history = []
-                for result in results:
-                    instruction = get_web_search_instruction(result)
-                    conversation_history.append(instruction)
-                return conversation_history
+                try:
+                    user_data = await self.load_user_data(self.user_id)
+                    user_instruction = user_data.get('instruction', '')
+
+                    conversation_history = await prepare_search_results(results, user_instruction)
+                    return conversation_history
+                except Exception as e:
+                    logger.error(f"prepare_search_results: Ошибка при подготовке результатов поиска: {e}")
+                    return [f"Произошла ошибка при подготовке результатов поиска: {e}"]
             
             elif request_type == 'images':
                 instructions = [get_image_search_instruction(result) for result in results]
@@ -380,7 +383,7 @@ class DiscordClient(discord.Client):
 
             if request_type:
                 try:
-                    search_results = await self.process_request(user_message, request_type=request_type)
+                    search_results = await self.process_request(user_message, user_id, request_type=request_type)
 
                     for result in search_results:
                         conversation_history.append({'role': 'assistant', 'content': result})

@@ -3,210 +3,221 @@
         "model": "gpt-4o-mini",
         "provider": "DDG",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.2890124320983887
+        "response_time": 2.196749448776245
     },
     {
-        "model": "gpt-4o",
-        "provider": "Blackbox",
+        "model": "gpt-4o-mini",
+        "provider": "CablyAI",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.9500854015350342
+        "response_time": 2.073678493499756
+    },
+    {
+        "model": "gpt-4o-mini",
+        "provider": "PollinationsAI",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 0.8710217475891113
     },
     {
         "model": "gpt-4o",
         "provider": "PollinationsAI",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 2.2540900707244873
+        "response": "Hi there! How can I assist you today? 😊",
+        "response_time": 3.045471668243408
     },
     {
-        "model": "gpt-4o",
-        "provider": "DarkAI",
-        "response": "Hello! What brings you here today? How can we work together on understanding your specific issue and uncovering the underlying causes?",
-        "response_time": 2.4703381061553955
+        "model": "o3-mini-low",
+        "provider": "CablyAI",
+        "response": "Hello there! How can I assist you today?",
+        "response_time": 2.9132659435272217
     },
     {
-        "model": "claude-3.5-sonnet",
-        "provider": "Blackbox",
-        "response": "Hi there! How are you doing today? Is there anything I can help you with?",
-        "response_time": 1.194124698638916
-    },
-    {
-        "model": "claude-3.5-sonnet",
+        "model": "o3-mini-low",
         "provider": "PollinationsAI",
-        "response": "Hello! 👋 How can I assist you today? Whether you have a question, need information, or just want to chat, I’m here to help! 😊",
-        "response_time": 15.287894248962402
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.8329229354858398
+    },
+    {
+        "model": "o3-mini",
+        "provider": "DDG",
+        "response": "Hi there! How can I help you today?",
+        "response_time": 2.343088150024414
     },
     {
         "model": "blackboxai",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.8141195774078369
+        "response_time": 0.9244577884674072
     },
     {
         "model": "command-r-plus",
         "provider": "HuggingSpace",
-        "response": "Hi there! How can I help you today?",
-        "response_time": 1.1172542572021484
+        "response": "Hi! How can I help you today?",
+        "response_time": 1.2896838188171387
     },
     {
         "model": "command-r-plus",
         "provider": "HuggingChat",
         "response": "Hello! How can I help you today?",
-        "response_time": 2.212860345840454
+        "response_time": 1.2087655067443848
     },
     {
         "model": "command-r7b-12-2024",
         "provider": "HuggingSpace",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.7727413177490234
-    },
-    {
-        "model": "gemini-1.5-flash",
-        "provider": "Blackbox",
-        "response": "**Hello! How can I assist you today?** \n\n- If you have a question, feel free to ask.\n- Need help with a specific topic? Just let me know!\n- I'm here to provide information or support.",
-        "response_time": 4.783179998397827
+        "response_time": 0.9695627689361572
     },
     {
         "model": "gemini-1.5-flash",
         "provider": "GizAI",
         "response": "Hello there! How can I help you today?",
-        "response_time": 0.5734755992889404
+        "response_time": 0.6481113433837891
     },
     {
-        "model": "gemini-1.5-pro",
+        "model": "gemini-1.5-flash",
+        "provider": "Blackbox",
+        "response": "**Hello! How can I assist you today?** \n\n- If you have a question or need information, feel free to ask!\n- I'm here to help with various topics, including programming, general knowledge, and more. \n\nLet me know what you need!",
+        "response_time": 2.4890007972717285
+    },
+    {
+        "model": "gemini-2.0-flash",
         "provider": "Blackbox",
         "response": "Hello! How can I assist you today?",
-        "response_time": 0.8278753757476807
+        "response_time": 1.6922202110290527
     },
     {
-        "model": "gemini-1.5-pro",
-        "provider": "GPROChat",
-        "response": "Why, hello there! I'm Gemini, a multi-modal AI model, developed by Google. How may I assist you today?",
-        "response_time": 1.6278407573699951
-    },
+        "model": "gemini-2.0-flash",
+        "provider": "PollinationsAI",
+        "response": "Hi there! How can I help you today?\n",
+        "response_time": 0.6169342994689941
+	},
     {
-        "model": "gemini-1.5-pro",
-        "provider": "AIChatFree",
-        "response": "Hi there! How can I help you today?",
-        "response_time": 1.613358736038208
-    },
+        "model": "gemini-2.0-flash-thinking",
+        "provider": "PollinationsAI",
+        "response": "Hello to you too!  It's nice to hear from you. How can I help you today? 😊",
+        "response_time": 11.752202272415161
+	},
     {
         "model": "llama-3.1-405b",
         "provider": "Blackbox",
-        "response": "**Hello! How can I assist you today?** \n\n- If you have a question or need information, feel free to ask!\n- I'm here to help with various topics, including programming, general knowledge, and more.",
-        "response_time": 1.1345024108886719
+        "response": "**Hello! How can I assist you today?** \n\n- If you have a question, feel free to ask.\n- Need help with a specific topic? Just let me know!\n- I'm here to provide information, guidance, or support.",
+        "response_time": 3.0350568294525146
     },
     {
         "model": "llama-3.2-11b",
         "provider": "HuggingChat",
-        "response": "How can I assist you today?",
-        "response_time": 1.4548146724700928
-    },
-    {
-        "model": "llama-3.3-70b",
-        "provider": "Blackbox",
-        "response": "Hello. It's nice to meet you. Is there something I can help you with or would you like to chat?",
-        "response_time": 1.1851420402526855
+        "response": "It's nice to meet you. Is there something I can help you with or would you like to chat?",
+        "response_time": 1.1407554149627686
     },
     {
         "model": "llama-3.3-70b",
         "provider": "HuggingChat",
-        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?",
-        "response_time": 2.4360973834991455
+        "response": "Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat?",
+        "response_time": 2.330012798309326
     },
     {
         "model": "llama-3.3-70b",
         "provider": "PollinationsAI",
-        "response": "Hello! How can I help you today?",
-        "response_time": 0.8448700904846191
+        "response": "Hello! How can I assist you today?",
+        "response_time": 0.8948686122894287
+    },
+    {
+        "model": "llama-3.3-70b",
+        "provider": "Blackbox",
+        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?",
+        "response_time": 1.9594261646270752
+    },
+    {
+        "model": "qwq-32b",
+        "provider": "HuggingChat",
+        "response": "Started reasoning...\nI'm here to help you with any questions or topics you'd like to discuss. Whether it's about technology, science, history, or anything else, I've got your back. So, what would you like to know today?Summarizing reasoning...\nBased on the given scenario, it seems like we have a potential project or task at hand, possibly related to developing a chatbot that helps users in a particular domain. Given the details, I can infer that we're creating a bot that will assist in answering questions, discussing topics, and possibly even provide information on environmental benefits. \n\nHowever, without further context or information about the project, it's difficult to pinpoint the exact requirements. If you could provide more details about the project, I can better understand the requirements and assist you in creating the necessary code.Done in 5s.\n",
+        "response_time": 5.836143493652344
     },
     {
         "model": "qwq-32b",
         "provider": "Blackbox",
         "response": "Hi there! How can I assist you today?",
-        "response_time": 0.8954899311065674
-    },
-    {
-        "model": "qwq-32b",
-        "provider": "HuggingChat",
-        "response": "Hi there! How can I assist you today?I'm here to help with any questions or topics you'd like to discuss. What's on your mind?",
-        "response_time": 3.1173434257507324
+        "response_time": 1.1840152740478516
     },
     {
         "model": "qwen-qvq-72b-preview",
         "provider": "HuggingSpace",
         "response": "Hi! I'm Qwen, a large language model created by Alibaba Cloud. How can I help you today?",
-        "response_time": 2.1028566360473633
+        "response_time": 3.9663541316986084
     },
     {
         "model": "qwen-2.5-72b",
         "provider": "HuggingChat",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.9409630298614502
+        "response_time": 1.2960760593414307
     },
     {
         "model": "qwen-2.5-coder-32b",
         "provider": "HuggingChat",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.5219652652740479
+        "response_time": 4.477174997329712
     },
     {
         "model": "qwen-2.5-coder-32b",
         "provider": "PollinationsAI",
-        "response": "Hello! How can I assist you today? Whether you have a coding question, need help with debugging, or want to discuss best practices, feel free to let me know!",
-        "response_time": 1.383209466934204
+        "response": "Hello! How can I assist you today? Are you working on a specific project or do you have a particular question or problem you need help with in coding or software development?",
+        "response_time": 1.6160101890563965
     },
     {
         "model": "nemotron-70b",
         "provider": "HuggingChat",
-        "response": "Hello!\n\nIt's nice to meet you! Is there something I can help you with or would you like to:\n\n1. **Chat about a topic** (e.g., hobbies, movies, books, or news)?\n2. **Ask a question** on a specific subject (e.g., history, science, technology, or more)?\n3. **Play a game** (e.g., 20 Questions, Word Chain, or Hangman)?\n4. **Generate creative content** (e.g., story, poem, or character ideas)?\n5. **Something else** (please share, and I'll do my best to assist you)?\n\nLet me know, and I'll be delighted to respond!",
-        "response_time": 5.713040590286255
-    },
-    {
-        "model": "deepseek-chat",
-        "provider": "Blackbox",
-        "response": "Hello! How can I help you today?",
-        "response_time": 1.5471181869506836
+        "response": "Hello!\n\nIt's nice to meet you! Is there something I can help you with or would you like to:\n\n1. **Chat about a topic** (e.g., hobbies, movies, books, or news)?\n2. **Ask a question** on a specific subject (e.g., history, science, technology, or more)?\n3. **Play a game** (e.g., 20 Questions, Hangman, Word Chain, or Trivia)?\n4. **Generate creative content** (e.g., story, poem, or character ideas)?\n5. **Something else** (please share, and I'll do my best to assist you)?\n\nLet me know, and I'll be delighted to help!",
+        "response_time": 6.018650770187378
     },
     {
         "model": "deepseek-chat",
         "provider": "PollinationsAI",
+        "response": "Hello! How can I assist you today?",
+        "response_time": 1.3073158264160156
+    },
+    {
+        "model": "deepseek-v3",
+        "provider": "Blackbox",
         "response": "Hello! How can I assist you today? 😊",
-        "response_time": 1.9027385711669922
+        "response_time": 5.874983549118042
+    },
+    {
+        "model": "deepseek-r1",
+        "provider": "BlackboxAPI",
+        "error": "Response 503: HTML content"
     },
     {
         "model": "deepseek-r1",
         "provider": "Blackbox",
-        "response": "Hello! How can I assist you today?",
-        "response_time": 3.086392879486084
+        "response": "<think>\n\n</think>\n\nHello! How can I assist you today? 😊",
+        "response_time": 1.3361608982086182
     },
     {
         "model": "deepseek-r1",
         "provider": "HuggingChat",
-        "response": "\nHi there! How can I assist you today?\n\n\nHello! How can I assist you today?",
-        "response_time": 1.9354987144470215
+        "response": "Started reasoning...\nAlright, the user greeted me with \"Hello!\" and I responded with the same. Now, they're asking about the best approach to learn a programming language. I should provide a comprehensive yet easy-to-follow plan. Maybe start with setting clear goals since that helps focus their efforts. Choosing the right language is crucial too, so I'll mention some popular ones like Python, Java, etc., depending on their interests in areas like web development or data science.\n\nNext, learning the basics is fundamental. I'll emphasize understanding variables, data types, loops, and conditional statements. Resources are important, so suggesting a mix of online courses, books, and documentation makes sense. Interactive platforms like Codecademy or LeetCode could be useful for hands-on practice.\n\nPracticing regularly is key, so I'll encourage working on small projects or solving coding problems. Building projects will help them apply what they've learnedEvaluating the options...\n, whether it's a personal project or contributing to open source. Joining online communities can provide support and motivation, so mentioning forums and social media groups is a good idea.\n\nFinding a study group or partner might help keep them accountable and offer different perspectives. Consistency is important, so I'll advise setting a regular study schedule. Solving problems on platforms like HackerRank or LeetCode can improve their skills, and reviewing and optimizing their code will help them becomeBreaking down complex ideas, focusing on small tasks and incremental progress....\n more efficient. Being patient and persistent is also key, as mastering a language takes time.\n\nFinally, continuous learning through following blogs and staying updated with trends will keep their knowledge fresh. To sum it up, I'll offer to help with specific topics or walk through an example problem together. That should cover a solid approach for them to get started or improve their programming skills.\nDone in 15s.\n\n\nHello! How can I assist you today? If you're looking to learn a programming language, I recommend starting with a clear goal in mind, such as web development, mobile app development, or data science. This will help you choose the right language and resources. Let me know if you'd like advice on any specific language or need help understanding a concept! How about we start with something fun, like learning how to print \"Hello, World!\" in Python?",
+        "response_time": 19.69666051864624
+    },
+    {
+        "model": "deepseek-r1",
+        "provider": "Glider",
+        "response": "<think>\nOkay, the user greeted me with \"Hello!\" so I need to respond in a friendly and welcoming manner. Let me think about the best way to do that. They might be starting a conversation or have a question. Since they didn't ask anything specific yet, I should invite them to ask whatever they need. Maybe something like, \"Hello! How can I assist you today?\" Keep it open and helpful. Yeah, that works. No need for anything complicated here. Just make sure the tone is upbeat and ready to help. Alright, let's go with that.\n</think>\n\nHello! How can I assist you today? 😊",
+        "response_time": 7.750917673110962
     },
     {
         "model": "mixtral-8x7b",
         "provider": "DDG",
         "response": " Hello! How can I assist you today? Please keep in mind that all communications are completely anonymous and no personal information is being recorded. If you have any questions about privacy, feel free to ask. I'm here to help with any programming, scripting, or configuration file-related questions you may have. When providing code examples, I will ensure that they are detailed, complete, correct, and runnable.",
-        "response_time": 1.8144261837005615
-    },
-    {
-        "model": "cably-80b",
-        "provider": "CablyAI",
-        "response": "Hello! It's nice to meet you. Is there something I can help you with or would you like to chat?",
-        "response_time": 1.3089501857757568
+        "response_time": 2.0127782821655273
     },
     {
         "model": "glm-4",
         "provider": "ChatGLM",
         "response": "Hello! How can I assist you today?",
-        "response_time": 1.6030831336975098
+        "response_time": 2.0331952571868896
     },
     {
         "model": "phi-3.5-mini",
         "provider": "HuggingChat",
         "response": " Hello! I'm Phi, an AI language model. How can I help you today?",
-        "response_time": 1.425630807876587
+        "response_time": 1.5198626518249512
     }
 ]

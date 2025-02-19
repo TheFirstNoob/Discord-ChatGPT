@@ -25,7 +25,6 @@ from utils.reminder_utils import load_reminders, save_reminders
 
 # g4f
 from g4f.client import AsyncClient
-from g4f.Provider import Prodia
 
 client = AsyncClient()
 
@@ -38,15 +37,15 @@ async def run_discord_bot():
         loop.create_task(discordClient.process_messages())
         logger.info(f'{discordClient.user} успешно запущена!')
 
-    @discordClient.tree.command(name="ask", description="Задать вопрос ChatGPT")
+    @discordClient.tree.command(name="ask", description=lm.get('ask_description'))
     @app_commands.describe(
-        message="Введите ваш запрос",
-        request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)"
+        message=lm.get('message_describe'),
+        request_type=lm.get('request_type_describe')
     )
     @app_commands.choices(request_type=[
-        app_commands.Choice(name="Поисковик", value="search"),
-        app_commands.Choice(name="Изображение", value="images"),
-        app_commands.Choice(name="Видео", value="videos")
+        app_commands.Choice(name=lm.get('request_type_search_name'), value="search"),
+        app_commands.Choice(name=lm.get('request_type_images_name'), value="images"),
+        app_commands.Choice(name=lm.get('request_type_videos_name'), value="videos")
     ])
     async def ask(
         interaction: discord.Interaction,
@@ -72,16 +71,16 @@ async def run_discord_bot():
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
         await discordClient.enqueue_message(interaction, message, request_type)
 
-    @discordClient.tree.command(name="asklong", description="Задать длинный вопрос ChatGPT через текст и файл")
+    @discordClient.tree.command(name="asklong", description=lm.get('asklong_description'))
     @app_commands.describe(
-        message="Введите ваш запрос",
-        file="Загрузите текстовый файл с вашим запросом/кодом и т.п.",
-        request_type="Тип запроса через интернет (Поисковик, Изображение, Видео)"
+        message=lm.get('message_describe'),
+        file=lm.get('asklong_file_describe'),
+        request_type=lm.get('request_type_describe')
     )
     @app_commands.choices(request_type=[
-        app_commands.Choice(name="Поисковик", value="search"),
-        app_commands.Choice(name="Изображение", value="images"),
-        app_commands.Choice(name="Видео", value="videos")
+        app_commands.Choice(name=lm.get('request_type_search_name'), value="search"),
+        app_commands.Choice(name=lm.get('request_type_images_name'), value="images"),
+        app_commands.Choice(name=lm.get('request_type_videos_name'), value="videos")
     ])
     async def asklong(
         interaction: discord.Interaction,
@@ -117,9 +116,10 @@ async def run_discord_bot():
         logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
         await discordClient.enqueue_message(interaction, message, request_type)
 
+
     @discordClient.tree.command(name="askpdf", description="Извлечь текст из PDF-файла и задать вопрос ИИ")
     @app_commands.describe(
-        message="Введите ваш запрос к ИИ",
+        message="Введите ваш запрос",
         file="Загрузите PDF-файл для извлечения текста"
     )
     async def askpdf(
@@ -165,10 +165,14 @@ async def run_discord_bot():
     @app_commands.choices(model=[
         app_commands.Choice(name="GPT 4o-Mini (OpenAI)", value="gpt-4o-mini"),
         app_commands.Choice(name="GPT 4o (OpenAI)", value="gpt-4o"),
-        app_commands.Choice(name="Claude 3.5 Sonnet (Anthropic)", value="claude-3.5-sonnet"),
+        app_commands.Choice(name="o3-Mini low (OpenAI)", value="o3-mini-low"),
+        app_commands.Choice(name="o3-Mini (OpenAI)", value="o3-mini"),
+        #app_commands.Choice(name="Claude 3.5 Sonnet (Anthropic)", value="claude-3.5-sonnet"),
         app_commands.Choice(name="Blackbox (Blackbox AI)", value="blackboxai"),
-        app_commands.Choice(name="Gemini 1.5 Flash (Google)", value="gemini-flash"),
-        app_commands.Choice(name="Gemini 1.5 Pro (Google)", value="gemini-pro"),
+        app_commands.Choice(name="Gemini 1.5 Flash (Google)", value="gemini-1.5-flash"),
+        app_commands.Choice(name="Gemini 2.0 Flash (Google)", value="gemini-2.0-flash"),
+        app_commands.Choice(name="Gemini 2.0 Flash Thinking (Google)", value="gemini-2.0-flash-thinking"),
+        #app_commands.Choice(name="Gemini 1.5 Pro (Google)", value="gemini-pro"),
         app_commands.Choice(name="Command R+ (Cohere)", value="command-r-plus"),
         app_commands.Choice(name="Command R7B+ (Cohere)", value="command-r7b-12-2024"),
         app_commands.Choice(name="LLaMa v3.1 405B (MetaAI)", value="llama-3.1-405b"),
@@ -179,9 +183,9 @@ async def run_discord_bot():
         app_commands.Choice(name="Qwen 2.5 72B (Qwen Team)", value="qwen-2.5-72b"),
         app_commands.Choice(name="Qwen 2.5 Coder 32B (Qwen Team)", value="qwen-2.5-coder-32b"),
         app_commands.Choice(name="DeepSeek LLM 67B (DeepSeek AI)", value="deepseek-chat"),
+        app_commands.Choice(name="DeepSeek v3 (DeepSeek AI)", value="deepseek-v3"),
         app_commands.Choice(name="DeepSeek R1 Thinking (DeepSeek AI)", value="deepseek-r1"),
         app_commands.Choice(name="Nemotron 70B Llama (Nvidia)", value="nemotron-70b"),
-        app_commands.Choice(name="Cably 80B (Cably Team Zhipu AI)", value="cably-80b"),
         app_commands.Choice(name="GLM-4 230B (GLM Team)", value="glm-4"),
         app_commands.Choice(name="Mixtral-8x7B (Mistral)", value="mixtral-8x7b"),
         app_commands.Choice(name="Phi 3.5 Mini (Microsoft)", value="phi-3.5-mini"),
@@ -198,7 +202,7 @@ async def run_discord_bot():
         selected_provider = await discordClient.get_provider_for_model(model.value)
         discordClient.chatBot = AsyncClient(provider=selected_provider)
 
-        await interaction.followup.send(f"> **ИНФО: Чат-модель изменена на: {model.name}.**")
+        await interaction.followup.send(f"> :white_check_mark: **УСПЕШНО:** Чат-модель изменена на: {model.name}.**")
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
         
     @discordClient.tree.command(name="instruction-set", description="Установить инструкцию для ИИ")
@@ -263,6 +267,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="4.4.0", value="4.4.0"),
         app_commands.Choice(name="4.3.0", value="4.3.0"),
         app_commands.Choice(name="4.2.0", value="4.2.0"),
         app_commands.Choice(name="4.1.0", value="4.1.0"),
@@ -345,12 +350,12 @@ async def run_discord_bot():
             logger.error(f"history: Критическая ошибка: {e}")
             await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось получить историю. {e}")
     
+
     async def generate_and_send_image(
         interaction: discord.Interaction, 
         prompt: str, 
         image_model: str, 
         model_name: str, 
-        client_type: str = 'default',
         count: int = 1
     ):
         try:
@@ -358,11 +363,7 @@ async def run_discord_bot():
 
             images_data = []
             for _ in range(count):
-                if client_type == 'prodia':
-                    prodia_client = AsyncClient(image_provider=Prodia)
-                    response = await prodia_client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
-                else:
-                    response = await client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
+                response = await client.images.generate(model=image_model, prompt=prompt, response_format="b64_json")
 
                 if response.data:
                     base64_text = response.data[0].b64_json
@@ -371,7 +372,7 @@ async def run_discord_bot():
 
                     with open(image_path, 'wb') as f:
                         f.write(image_data)
-
+    
                     images_data.append(image_path)
                 else:
                     await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение. Ответ не содержит данных.")
@@ -403,19 +404,15 @@ async def run_discord_bot():
         count="Количество изображений для генерации"
     )
     @app_commands.choices(image_model=[
-        app_commands.Choice(name="Stable Diffusion XL", value="sdxl"),
-        app_commands.Choice(name="Stable Diffusion v3", value="sd-3"),
-        app_commands.Choice(name="Playground v2.5", value="playground-v2.5"),
+        app_commands.Choice(name="Stable Diffusion XL", value="sdxl-turbo"),
+        app_commands.Choice(name="Stable Diffusion v3.5", value="sd-3.5"),
+        app_commands.Choice(name="FLUX", value="flux"),
         app_commands.Choice(name="FLUX Pro", value="flux-pro"),
-        app_commands.Choice(name="FLUX 4o", value="flux-4o"),
+        app_commands.Choice(name="FLUX Dev", value="flux-dev"),
         app_commands.Choice(name="FLUX Realism", value="flux-realism"),
-        app_commands.Choice(name="FLUX Anime", value="flux-anime"),
-        app_commands.Choice(name="FLUX 3D", value="flux-3d"),
-        app_commands.Choice(name="FLUX Disney", value="flux-disney"),
-        app_commands.Choice(name="FLUX Pixel", value="flux-pixel"),
+        app_commands.Choice(name="FLUX Schnell", value="flux-schnell"),
         app_commands.Choice(name="Midjourney", value="midjourney"),
         app_commands.Choice(name="Dall-E V3", value="dall-e-3"),
-        app_commands.Choice(name="Any Dark", value="any-dark"),
     ])
     @app_commands.choices(count=[
         app_commands.Choice(name="1", value=1),
@@ -444,70 +441,6 @@ async def run_discord_bot():
             prompt, 
             image_model.value, 
             image_model.name,
-            count=count
-        )
-
-    @discordClient.tree.command(name="draw-prodia", description="Сгенерировать изображение от модели ИИ с использованием Prodia")
-    @app_commands.describe(
-        prompt="Введите ваш запрос (На Английском языке)",
-        image_model="Выберите модель для генерации изображения",
-        count="Количество изображений для генерации"
-    )
-    @app_commands.choices(image_model=[
-        app_commands.Choice(name="3 Guofeng3 v3.4", value="3Guofeng3_v34.safetensors [50f420de]"),
-        app_commands.Choice(name="Absolute Reality v1.8.1", value="absolutereality_v181.safetensors [3d9d4d2b]"),
-        app_commands.Choice(name="Am I Real v4.1", value="amIReal_V41.safetensors [0a8a2e61]"),
-        app_commands.Choice(name="Anything v5", value="anythingV5_PrtRE.safetensors [893e49b9]"),
-        app_commands.Choice(name="Blazing Drive v10g", value="blazing_drive_v10g.safetensors [ca1c1eab]"),
-        app_commands.Choice(name="Cetus Mix v3.5", value="cetusMix_Version35.safetensors [de2f2560]"),
-        app_commands.Choice(name="Childrens Stories 3D", value="childrensStories_v13D.safetensors [9dfaabcb]"),
-        app_commands.Choice(name="Childrens Stories Semi-Real", value="childrensStories_v1SemiReal.safetensors [a1c56dbb]"),
-        app_commands.Choice(name="Childrens Stories Toon-Anime", value="childrensStories_v1ToonAnime.safetensors [2ec7b88b]"),
-        app_commands.Choice(name="CuteYukimix MidChapter3", value="cuteyukimixAdorable_midchapter3.safetensors [04bdffe6]"),
-        app_commands.Choice(name="Cyber Realistic v3.3", value="cyberrealistic_v33.safetensors [82b0d085]"),
-        app_commands.Choice(name="Dalcefo v4", value="dalcefo_v4.safetensors [425952fe]"),
-        app_commands.Choice(name="DreamLike Anime v1.0", value="dreamlike-anime-1.0.safetensors [4520e090]"),
-        app_commands.Choice(name="DreamLike Diffusion v1.0", value="dreamlike-diffusion-1.0.safetensors [5c9fd6e0]"),
-        app_commands.Choice(name="DreamLike Photoreal v2.0", value="dreamlike-photoreal-2.0.safetensors [fdcf65e7]"),
-        app_commands.Choice(name="Dreamshaper v8", value="dreamshaper_8.safetensors [9d40847d]"),
-        app_commands.Choice(name="Eimis Anime Diffusion v1.0", value="EimisAnimeDiffusion_V1.ckpt [4f828a15]"),
-        app_commands.Choice(name="Elldreth`s Vivid", value="elldreths-vivid-mix.safetensors [342d9d26]"),
-        app_commands.Choice(name="EpicPhotoGasm x Plus Plus", value="epicphotogasm_xPlusPlus.safetensors [1a8f6d35]"),
-        app_commands.Choice(name="EpicRealism Natural Sin RC1", value="epicrealism_naturalSinRC1VAE.safetensors [90a4c676]'"),
-        app_commands.Choice(name="EpicRealism Pure Evolution V3", value="epicrealism_pureEvolutionV3.safetensors [42c8440c]"),
-        app_commands.Choice(name="I Cant Believe Its Not Photography Seco", value="ICantBelieveItsNotPhotography_seco.safetensors [4e7a3dfd]"),
-        app_commands.Choice(name="Openjourney V4", value="openjourney_V4.ckpt [ca2f377f]"),
-        app_commands.Choice(name="Pastel Mix Stylized Anime", value="pastelMixStylizedAnime_pruned_fp16.safetensors [793a26e8]"),
-        app_commands.Choice(name="Realistic Vision V5.1", value="Realistic_Vision_V5.1.safetensors [a0f13c83]"),
-    ])
-    @app_commands.choices(count=[
-        app_commands.Choice(name="1", value=1),
-        app_commands.Choice(name="2", value=2),
-        app_commands.Choice(name="3", value=3),
-        app_commands.Choice(name="4", value=4),
-    ])
-    async def draw_prodia(
-        interaction: discord.Interaction,
-        prompt: str,
-        image_model: app_commands.Choice[str],
-        count: Optional[int] = 1
-    ):
-        if await check_ban_and_respond(interaction):
-            return
-
-        if interaction.user == discordClient.user:
-            return
-
-        username = str(interaction.user)
-        channel = str(interaction.channel)
-        logger.info(f"\x1b[31m{username}\x1b[0m : /draw-prodia [{prompt}] в ({channel}) через [{image_model.name}] Кол-во: [{count}]")
-
-        await generate_and_send_image(
-            interaction, 
-            prompt, 
-            image_model.value, 
-            image_model.name, 
-            client_type='prodia',
             count=count
         )
 

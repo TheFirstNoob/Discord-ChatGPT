@@ -3,8 +3,8 @@ audioop-lts; python_version>='3.13'
 python-dotenv==1.0.1
 asgiref==3.8.1
 aiofiles==24.1.0
-beautifulsoup4==4.12.3
-duckduckgo-search==7.2.0
+beautifulsoup4==4.13.3
+duckduckgo-search==7.4.3
 pdfminer.six==20240706
-cryptography==44.0.0
-g4f==0.4.2.6
+cryptography==44.0.1
+g4f==0.4.6.2
