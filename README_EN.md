@@ -157,7 +157,6 @@
 | `/asklong`        | Chat with AI with a larger context request   |
 | `/askpdf`         | Chat with AI with a PDF file (Text only)     |
 | `/draw`           | Create an image using AI                     |
-| `/draw-prodia`    | Create an image using AI with Prodia         |
 
 ### Information
 | Command        | Description                                  |
@@ -180,15 +179,15 @@
 | `/instruction-reset ` | Reset AI instuction   |
 
 ### Admin Tool
-| Command         | Description                        |
-|-----------------|------------------------------------|
-| `/ban`     	  | Block access to the bot for user   |
-| `/unban`    	  | Unblock access to the bot for user |
-| `/banned-list ` | List banned users  		       |
+| Command         | Description                        	|
+|-----------------|-------------------------------------|
+| `/ban`     	  | Block access to the bot for user   	|
+| `/unban`    	  | Unblock access to the bot for user 	|
+| `/banned-list ` | List banned users  		       		|
 
 ### Management
 | Command        	| Description                       |
-|-----------------------|-----------------------------------|
+|-----------------------|-------------------------------|
 | `/reset`       	| Reset conversation history        |
 | `/chat-model` 	| Switch chat model                 |
 | `/history`     	| Download conversation history     |
