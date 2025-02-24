@@ -5,6 +5,6 @@ asgiref==3.8.1
 aiofiles==24.1.0
 beautifulsoup4==4.13.3
 duckduckgo-search==7.4.3
-pdfminer.six==20240706
+pymupdf==1.25.3
 cryptography==44.0.1
 g4f==0.4.6.2

@@ -231,9 +231,6 @@ class DiscordClient(discord.Client):
         self.chatBot = AsyncClient(provider=self.default_provider)
         self.current_channel = None
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
-
-        self.message_queue = asyncio.Queue()
-        self.new_message_event = asyncio.Event()
         
     async def setup_hook(self):
         if not hasattr(self, 'reminder_task') or self.reminder_task is None:
@@ -260,20 +257,6 @@ class DiscordClient(discord.Client):
 
         return False, None
 
-    async def process_messages(self):
-        while True:
-            await self.new_message_event.wait()
-            self.new_message_event.clear()
-
-            tasks = []
-            while not self.message_queue.empty():
-                message, user_message, request_type = await self.message_queue.get()
-                tasks.append(self.send_message(message, user_message, request_type))
-                self.message_queue.task_done()
-
-            if tasks:
-                await asyncio.gather(*tasks)
-            
     async def process_request(self, query, user_id: int, request_type="search"):
         self.user_id = user_id
         try:
@@ -302,19 +285,15 @@ class DiscordClient(discord.Client):
             logger.error(f"Ошибка в process_request: {e}")
             return [f"Произошла ошибка при поиске: {e}"]
 
-    async def enqueue_message(self, message, user_message, request_type):
-        await self.message_queue.put((message, user_message, request_type))
-        self.new_message_event.set()
-
     async def send_message(self, message, user_message, request_type):
-        if hasattr(message, 'user'):
-            user_id = message.user.id
-        elif hasattr(message, 'author'):
-            user_id = message.author.id
-        else:
-            raise ValueError("send_message: Неподдерживаемый тип объекта message")
-
         try:
+            if hasattr(message, 'user'):
+                user_id = message.user.id
+            elif hasattr(message, 'author'):
+                user_id = message.author.id
+            else:
+                raise ValueError("send_message: Неподдерживаемый тип объекта message")
+
             response = await self.handle_response(user_id, user_message, request_type)
             response_content = f'\n{response}'
             await send_split_message(self, response_content, message)

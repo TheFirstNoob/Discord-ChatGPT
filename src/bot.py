@@ -6,13 +6,13 @@ import asyncio
 import aiohttp
 import aiofiles
 import mimetypes
+import fitz  # PyMuPDF
 
 import discord
 from discord import app_commands, Attachment
 
 from datetime import datetime, timedelta
 from typing import Optional
-from pdfminer.high_level import extract_text
 
 # local
 from src.locale_manager import locale_manager as lm # For locale later
@@ -33,8 +33,6 @@ async def run_discord_bot():
     async def on_ready():
         await discordClient.send_start_prompt()
         await discordClient.tree.sync()
-        loop = asyncio.get_event_loop()
-        loop.create_task(discordClient.process_messages())
         logger.info(f'{discordClient.user} успешно запущена!')
 
     @discordClient.tree.command(name="ask", description=lm.get('ask_description'))
@@ -69,7 +67,7 @@ async def run_discord_bot():
         user_model = user_data.get('model', discordClient.default_model)
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
-        await discordClient.enqueue_message(interaction, message, request_type)
+        asyncio.create_task(discordClient.send_message(interaction, message, request_type))
 
     @discordClient.tree.command(name="asklong", description=lm.get('asklong_description'))
     @app_commands.describe(
@@ -114,7 +112,7 @@ async def run_discord_bot():
             return
 
         logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
-        await discordClient.enqueue_message(interaction, message, request_type)
+        asyncio.create_task(discordClient.send_message(interaction, message, request_type))
 
 
     @discordClient.tree.command(name="askpdf", description="Извлечь текст из PDF-файла и задать вопрос ИИ")
@@ -149,14 +147,18 @@ async def run_discord_bot():
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_content)
 
-            extracted_text = extract_text(pdf_path)
+            doc = fitz.open(pdf_path)
+            extracted_text = ""
+            for page in doc:
+                extracted_text += page.get_text()
+
+            doc.close()
             os.remove(pdf_path)
 
             full_message = f"{message}\n\n{extracted_text}"
             logger.info(f"\x1b[31m{username}\x1b[0m : /askpdf [Текст: {message}, PDF: {file.filename}] в ({discordClient.current_channel})")
-            await discordClient.enqueue_message(interaction, full_message, request_type=None)
-            
-            await interaction.followup.send("> :white_check_mark: **Ваш запрос и текст из PDF отправлены на обработку! Пожалуйста ожидайте...**")
+            asyncio.create_task(discordClient.send_message(interaction, full_message, request_type=None))
+
         except Exception as e:
             logger.exception(f"askpdf: Ошибка при обработке PDF-файла: {e}")
             await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
@@ -202,7 +204,7 @@ async def run_discord_bot():
         selected_provider = await discordClient.get_provider_for_model(model.value)
         discordClient.chatBot = AsyncClient(provider=selected_provider)
 
-        await interaction.followup.send(f"> :white_check_mark: **УСПЕШНО:** Чат-модель изменена на: {model.name}.**")
+        await interaction.followup.send(f"> :white_check_mark: **УСПЕШНО:** Чат-модель изменена на: **{model.name}**")
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
         
     @discordClient.tree.command(name="instruction-set", description="Установить инструкцию для ИИ")
@@ -624,7 +626,7 @@ async def run_discord_bot():
                 discordClient.current_channel = message.channel
 
                 logger.info(f"\x1b[31m{message.author}\x1b[0m : Упоминание бота [{clean_message}] в ({message.channel})")
-                await discordClient.enqueue_message(message, clean_message, None)
+                asyncio.create_task(discordClient.send_message(message, clean_message, None))
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
     await discordClient.start(TOKEN)
