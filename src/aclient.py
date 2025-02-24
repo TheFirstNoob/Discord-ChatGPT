@@ -233,6 +233,7 @@ class DiscordClient(discord.Client):
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
 
         self.message_queue = asyncio.Queue()
+        self.new_message_event = asyncio.Event()
         
     async def setup_hook(self):
         if not hasattr(self, 'reminder_task') or self.reminder_task is None:
@@ -261,16 +262,17 @@ class DiscordClient(discord.Client):
 
     async def process_messages(self):
         while True:
-            if self.current_channel is not None:
-                tasks = []
-                while not self.message_queue.empty():
-                    async with self.current_channel.typing():
-                        message, user_message, request_type = await self.message_queue.get()
-                        tasks.append(self.send_message(message, user_message, request_type))
-                        self.message_queue.task_done()
-                if tasks:
-                    await asyncio.gather(*tasks)
-            await asyncio.sleep(1)
+            await self.new_message_event.wait()
+            self.new_message_event.clear()
+
+            tasks = []
+            while not self.message_queue.empty():
+                message, user_message, request_type = await self.message_queue.get()
+                tasks.append(self.send_message(message, user_message, request_type))
+                self.message_queue.task_done()
+
+            if tasks:
+                await asyncio.gather(*tasks)
             
     async def process_request(self, query, user_id: int, request_type="search"):
         self.user_id = user_id
@@ -302,6 +304,7 @@ class DiscordClient(discord.Client):
 
     async def enqueue_message(self, message, user_message, request_type):
         await self.message_queue.put((message, user_message, request_type))
+        self.new_message_event.set()
 
     async def send_message(self, message, user_message, request_type):
         if hasattr(message, 'user'):
