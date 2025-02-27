@@ -18,10 +18,9 @@ from typing import Optional
 from src.locale_manager import locale_manager as lm # For locale later
 from src.log import logger
 from src.aclient import discordClient
-from src.aclient import check_ban_and_respond
-from src.ban_manager import ban_manager
 from utils.files_utils import read_file, write_file
-from utils.reminder_utils import load_reminders, save_reminders
+from utils.reminder_utils import reminder_manager
+from utils.ban_utils import ban_manager
 
 # g4f
 from g4f.client import AsyncClient
@@ -53,7 +52,8 @@ async def run_discord_bot():
     ):
         await interaction.response.defer(ephemeral=False)
 
-        if await check_ban_and_respond(interaction):
+        is_banned = await ban_manager.check_ban_and_respond(interaction)
+        if is_banned:
             return
 
         if interaction.user == discordClient.user:
@@ -88,7 +88,8 @@ async def run_discord_bot():
     ):
         await interaction.response.defer(ephemeral=False)
 
-        if await check_ban_and_respond(interaction):
+        is_banned = await ban_manager.check_ban_and_respond(interaction)
+        if is_banned:
             return
 
         if interaction.user == discordClient.user:
@@ -114,7 +115,6 @@ async def run_discord_bot():
         logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
         asyncio.create_task(discordClient.send_message(interaction, message, request_type))
 
-
     @discordClient.tree.command(name="askpdf", description="Извлечь текст из PDF-файла и задать вопрос ИИ")
     @app_commands.describe(
         message="Введите ваш запрос",
@@ -127,7 +127,8 @@ async def run_discord_bot():
     ):
         await interaction.response.defer(ephemeral=False)
 
-        if await check_ban_and_respond(interaction):
+        is_banned = await ban_manager.check_ban_and_respond(interaction)
+        if is_banned:
             return
 
         if interaction.user == discordClient.user:
@@ -206,7 +207,7 @@ async def run_discord_bot():
 
         await interaction.followup.send(f"> :white_check_mark: **УСПЕШНО:** Чат-модель изменена на: **{model.name}**")
         logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
-        
+
     @discordClient.tree.command(name="instruction-set", description="Установить инструкцию для ИИ")
     @app_commands.describe(instruction="Инструкция для ИИ")
     async def instruction_set(interaction: discord.Interaction, instruction: str):
@@ -215,7 +216,7 @@ async def run_discord_bot():
         await discordClient.set_user_instruction(user_id, instruction)
         await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Инструкция установлена!")
         logger.info(f"Пользователь {interaction.user} установил инструкцию.")
-        
+
     @discordClient.tree.command(name="instruction-reset", description="Сбросить инструкцию для ИИ")
     async def instruction_reset(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -223,7 +224,6 @@ async def run_discord_bot():
         await discordClient.reset_user_instruction(user_id)
         await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Инструкция сброшена!")
         logger.info(f"Пользователь {interaction.user} сбросил инструкцию.")
-
 
     @discordClient.tree.command(name="reset", description="Сброс всех параметров и истории диалога")
     async def reset(
@@ -247,7 +247,7 @@ async def run_discord_bot():
             await interaction.followup.send(f"> :x: **ОШИБКА:** Файл help.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
             logger.error(f"help: Файл справки не найден: {help_file_path}")
             return
-        
+
         await interaction.followup.send(help_text)
         logger.info(f"\x1b[31m{username} использовал(а) команду help!\x1b[0m")
 
@@ -256,13 +256,13 @@ async def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         about_file_path = 'texts/about.txt'
-        
+
         about_text = await read_file(about_file_path)
         if not about_text:
             await interaction.followup.send(f"> :x: **ОШИБКА:** Файл about.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
             logger.error(f"about: Файл информации не найден: {about_file_path}")
             return
-        
+
         about_text = about_text.format(username=username)
         await interaction.followup.send(about_text)
         logger.info(f"\x1b[31m{username} использовал(а) команду about!\x1b[0m")
@@ -318,21 +318,19 @@ async def run_discord_bot():
             return
 
         user_id = interaction.user.id
-        
+
         try:
-            # Загрузка данных с учетом возможного шифрования
             user_data = await discordClient.load_user_data(user_id)
             
             if not user_data or not user_data.get('history'):
                 await interaction.followup.send("> :x: **ОШИБКА:** История сообщений пуста!")
                 return
 
-            # Создаем временный файл с историей
             temp_filepath = f'temp_history_{user_id}.json'
-            
+
             async with aiofiles.open(temp_filepath, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(user_data, ensure_ascii=False, indent=4))
-            
+
             try:
                 with open(temp_filepath, 'rb') as file:
                     await interaction.followup.send(
@@ -342,12 +340,11 @@ async def run_discord_bot():
             except Exception as e:
                 logger.error(f"history: Ошибка при отправке файла: {e}")
                 await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось отправить файл. {e}")
-            
-            # Удаляем временный файл
+
             os.remove(temp_filepath)
-            
+
             logger.info(f"\x1b[31m{username} запросил(а) историю сообщений с ботом\x1b[0m")
-        
+
         except Exception as e:
             logger.error(f"history: Критическая ошибка: {e}")
             await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось получить историю. {e}")
@@ -403,7 +400,7 @@ async def run_discord_bot():
     @app_commands.describe(
         prompt="Введите ваш запрос (На Английском языке)",
         image_model="Выберите модель для генерации изображения",
-        count="Количество изображений для генерации"
+        count="Количество изображений для генерации (необязательно, по умолчанию - 1)"
     )
     @app_commands.choices(image_model=[
         app_commands.Choice(name="Stable Diffusion XL", value="sdxl-turbo"),
@@ -428,7 +425,8 @@ async def run_discord_bot():
         image_model: app_commands.Choice[str],
         count: Optional[int] = 1
     ):
-        if await check_ban_and_respond(interaction):
+        is_banned = await ban_manager.check_ban_and_respond(interaction)
+        if is_banned:
             return
 
         if interaction.user == discordClient.user:
@@ -469,7 +467,6 @@ async def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         username = str(interaction.user)
-        reminders = await load_reminders(user_id)
 
         try:
             reminder_time = datetime(year, month, day, hour, minute)
@@ -484,15 +481,15 @@ async def run_discord_bot():
                 await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание больше чем на год.")
                 return
 
-            reminders.append({"time": reminder_time.isoformat(), "message": message})
-            await save_reminders(user_id, reminders)
-            await interaction.followup.send(f"> :white_check_mark: **Напоминание установлено на {reminder_time.strftime('%Y-%m-%d %H:%M')}!** \n Вы получите сообщение от меня когда настанет требуемое время :wink:")
-            logger.info(f"\x1b[31m{username} установил себе напоминание\x1b[0m")
+            reminder_id = await reminder_manager.add_reminder(user_id, message, reminder_time)
+            if reminder_id:
+                await interaction.followup.send(f"> :white_check_mark: **Напоминание установлено на {reminder_time.strftime('%Y-%m-%d %H:%M')}!** \n Вы получите сообщение от меня когда настанет требуемое время :wink:")
+                logger.info(f"\x1b[31m{username} установил себе напоминание\x1b[0m")
         except ValueError as ve:
-            logger.exception(f" remind: Ошибка при установке напоминания: {str(ve)}")
+            logger.exception(f"remind: Ошибка при установке напоминания: {str(ve)}")
             await interaction.followup.send("> :x: **ОШИБКА:** Неверный формат времени. Пожалуйста, убедитесь, что все значения корректны.")
         except Exception as e:
-            logger.exception(f" remind: Ошибка при установке напоминания: {str(e)}")
+            logger.exception(f"remind: Ошибка при установке напоминания: {str(e)}")
             await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
 
     @discordClient.tree.command(name="remind-list", description="Показать все ваши напоминания")
@@ -502,35 +499,36 @@ async def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         user_id = interaction.user.id
-        reminders = await load_reminders(user_id)
 
+        reminders = await reminder_manager.load_reminders(user_id)
         if not reminders:
             await interaction.followup.send("> :warning: **У вас нет активных напоминаний.**")
             return
 
-        reminder_list = "\n".join([f"{index + 1}. {reminder['time']} - {reminder['message']}" for index, reminder in enumerate(reminders)])
+        reminder_list = "\n".join(
+            [f"{index + 1}. {datetime.fromisoformat(reminder['time']).strftime('%Y-%m-%d %H:%M')} - {reminder['message']} (ID: {reminder['id']})"
+             for index, reminder in enumerate(reminders)]
+        )
         await interaction.followup.send(f"> :page_with_curl: **Список напоминаний:**\n{reminder_list}")
         logger.info(f"\x1b[31m{username} запросил список своих напоминаний\x1b[0m")
 
     @discordClient.tree.command(name="remind-delete", description="Удалить напоминание")
-    @app_commands.describe(index="Индекс напоминания для удаления")
+    @app_commands.describe(reminder_id="ID напоминания для удаления")
     async def delete_reminder(
         interaction: discord.Interaction,
-        index: int
+        reminder_id: str
     ):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
-        reminders = await load_reminders(user_id)
+        username = str(interaction.user)
 
-        if index < 1 or index > len(reminders):
-            await interaction.followup.send("> :x: **ОШИБКА:** Неверный индекс напоминания.")
-            return
+        success = await reminder_manager.remove_reminder(user_id, reminder_id)
+        if success:
+            await interaction.followup.send(f"> :white_check_mark: **Напоминание удалено!**")
+            logger.info(f"\x1b[31m{username} удалил напоминание с ID {reminder_id}\x1b[0m")
+        else:
+            await interaction.followup.send("> :x: **ОШИБКА:** Не удалось удалить напоминание. Проверьте правильность ID.")
 
-        reminders.pop(index - 1)
-        await save_reminders(user_id, reminders)
-        await interaction.followup.send(f"> :white_check_mark: **Напоминание удалено!**")
-        logger.info(f"\x1b[31m{username} удалил напомнание\x1b[0m")
-        
     @discordClient.tree.command(name="ban", description="Забанить пользователя")
     @app_commands.describe(
         user_id="ID пользователя, которого нужно забанить",
@@ -539,9 +537,9 @@ async def run_discord_bot():
     )
     async def ban_user(
         interaction: discord.Interaction, 
-        user_id: str, # it should be int but discord bug?
-        reason: str = "Нарушение правил",
-        days: int = None
+        user_id: str,  # it should be int but discord bug?
+        reason: Optional[str] = "Нарушение правил",
+        days: Optional[int] = None
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -549,21 +547,22 @@ async def run_discord_bot():
             await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
             return
 
-        duration = {'days': days} if days else None
-        
-        logger.info(f"Попытка бана пользователя {user_id} администратором {interaction.user.id}. Причина: {reason}")
-        
+        logger.info(f"ban_user: Попытка бана пользователя {user_id} администратором {interaction.user.id}. Причина: {reason}")
+
         try:
             await ban_manager.ban_user(
-                user_id, 
+                int(user_id),
                 reason, 
-                duration
+                days=days
             )
-            logger.info(f"Пользователь {user_id} успешно забанен администратором {interaction.user.id}")
+            logger.info(f"ban_user: Команда бана для пользователя {user_id} выполнена успешно.")
             await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно забанен**")
         except Exception as e:
-            logger.error(f"ban_user Ошибка при бане пользователя {user_id}: {e}")
-            await interaction.followup.send(f"> :x: **Произошла ошибка при бане: {e}**")
+            logger.error(f"ban_user: Ошибка при выполнении команды бана для пользователя {user_id}: {e}")
+            await interaction.followup.send(
+                f"> :x: **Произошла ошибка при бане:**\n"
+                f"```\n{str(e)}\n```"
+            )
 
     @discordClient.tree.command(name="unban", description="Разбанить пользователя")
     @app_commands.describe(
@@ -571,7 +570,7 @@ async def run_discord_bot():
     )
     async def unban_user(
         interaction: discord.Interaction, 
-        user_id: str # it should be int but discord bug?
+        user_id: str  # it should be int but discord bug?
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -579,18 +578,62 @@ async def run_discord_bot():
             await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
             return
 
-        logger.info(f"Попытка разбана пользователя {user_id} администратором {interaction.user.id}")
-        
+        logger.info(f"unban_user: Попытка разбана пользователя {user_id} администратором {interaction.user.id}")
+
         try:
             result = await ban_manager.unban_user(int(user_id))
             if result:
-                logger.info(f"Пользователь {user_id} успешно разбанен администратором {interaction.user.id}")
                 await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно разбанен**")
             else:
                 await interaction.followup.send(f"> :warning: **Пользователь {user_id} не был забанен**")
         except Exception as e:
-            logger.error(f"unban_user: Ошибка при разбане пользователя {user_id}: {e}")
-            await interaction.followup.send(f"> :x: **Произошла ошибка при разбане: {e}**")
+            logger.error(f"unban_user: Ошибка при выполнении команды разбана для пользователя {user_id}: {e}")
+            await interaction.followup.send(
+                f"> :x: **Произошла ошибка при разбане:**\n"
+                f"```\n{str(e)}\n```"
+            )
+
+    @discordClient.tree.command(name="ban-info", description="Проверить блокировку и показать информацию о бане")
+    @app_commands.describe(
+        user_id="ID пользователя (необязательно, по умолчанию - Вы)"
+    )
+    async def ban_info(
+        interaction: discord.Interaction, 
+        user_id: Optional[str] = None
+    ):
+        await interaction.response.defer(ephemeral=True)
+
+        target_user_id = int(user_id) if user_id else interaction.user.id
+
+        try:
+            is_banned, reason = await ban_manager.is_user_banned(target_user_id)
+
+            if is_banned:
+                ban_file = os.path.join(ban_manager.bans_dir, f'{target_user_id}_ban.json')
+                ban_data = await read_json(ban_file)
+                ban_time = datetime.fromisoformat(ban_data['timestamp'])
+                duration = ban_data['duration']
+
+                if duration:
+                    unban_time = ban_time + timedelta(**duration)
+                    unban_text = f"**Дата разбана:** {unban_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                else:
+                    unban_text = "**Бан перманентный!**"
+
+                await interaction.followup.send(
+                    f"> :x: **Пользователю {target_user_id} запрещен доступ к боту!**\n"
+                    f"**Причина:** {reason}\n"
+                    f"**Дата бана:** {ban_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"{unban_text}"
+                )
+            else:
+                await interaction.followup.send(f"> :white_check_mark: **Пользователь {target_user_id} не забанен и может пользоваться ботом. **")
+        except Exception as e:
+            logger.error(f"ban_info: Ошибка при получении информации о бане для пользователя {target_user_id}: {e}")
+            await interaction.followup.send(
+                f"> :x: **Произошла ошибка при получении информации о бане:**\n"
+                f"```\n{str(e)}\n```"
+            )
 
     @discordClient.tree.command(name="banned-list", description="Список забаненных пользователей")
     async def list_banned_users(
@@ -603,7 +646,7 @@ async def run_discord_bot():
             return
 
         banned_users = await ban_manager.get_banned_users(interaction.user.id)
-        
+
         if not banned_users:
             await interaction.followup.send("> :white_check_mark: **Нет забаненных пользователей.**")
             return
@@ -612,8 +655,10 @@ async def run_discord_bot():
             f"**ID:** {user['user_id']}, **Причина:** {user['reason']}" 
             for user in banned_users
         ])
-        await interaction.followup.send(f"Забаненные пользователи:\n{banned_list}")
-        
+
+        logger.info(f"Администратор {user_id} запросил список забаненных")
+        await interaction.followup.send(f"### Забаненные пользователи:\n{banned_list}")
+
     @discordClient.event
     async def on_message(message):
         if message.author == discordClient.user:

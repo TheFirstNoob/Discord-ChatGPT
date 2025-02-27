@@ -56,11 +56,11 @@ from g4f.models import __models__
 # local
 from src.locale_manager import locale_manager as lm  # For locale later
 from src.log import logger
-from src.ban_manager import ban_manager
 from utils.message_utils import send_split_message
 from utils.files_utils import read_json, write_json, read_file, write_file
 from utils.encryption_utils import UserDataEncryptor
-from utils.reminder_utils import check_reminders
+from utils.reminder_utils import reminder_manager
+from utils.ban_utils import ban_manager
 from utils.internet_utils import search_web, get_website_info, prepare_search_results
 from utils.internet_instructions_utils import get_web_search_instruction, get_image_search_instruction, get_video_search_instruction
 
@@ -68,6 +68,7 @@ from utils.internet_instructions_utils import get_web_search_instruction, get_im
 SYSTEM_DATA_FILE = 'system.json'
 USER_DATA_DIR = 'user_data'
 REMINDERS_DIR = 'reminders'
+BANS_DIR = 'bans'
 SYSTEM_INSTRUCTION_FILE = "system_prompt.txt"
 
 load_dotenv()
@@ -89,6 +90,8 @@ if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 if not os.path.exists(REMINDERS_DIR):
     os.makedirs(REMINDERS_DIR)
+if not os.path.exists(BANS_DIR):
+    os.makedirs(BANS_DIR)
 
 async def check_ban_and_respond(interaction):
     try:
@@ -225,6 +228,7 @@ class DiscordClient(discord.Client):
         self.cache_enabled = os.getenv("CACHE_ENABLED", "True").lower() == "true"
         self.encrypt_user_data = os.getenv('ENCRYPT_USER_DATA', 'False').lower() == 'true'
         self.reminder_task = None
+        self.ban_cleanup_task = None
 
         default_providers = self.providers_dict.get(self.default_model, [])
         self.default_provider = RetryProvider(default_providers, shuffle=False)
@@ -233,29 +237,27 @@ class DiscordClient(discord.Client):
         self.activity = discord.Activity(type=discord.ActivityType.listening, name="/ask /draw /help")
         
     async def setup_hook(self):
-        if not hasattr(self, 'reminder_task') or self.reminder_task is None:
-            self.reminder_task = asyncio.create_task(check_reminders(self))
+        async def run_reminders_check():
+            while True:
+                try:
+                    await reminder_manager()
+                except Exception as e:
+                    logger.error(f"setup_hook: Ошибка в задаче проверки напоминаний: {e}")
+                    await asyncio.sleep(30)
 
-    async def check_user_ban(self, user_id):
-        is_banned, reason = await ban_manager.is_user_banned(user_id)
-        
-        if is_banned:
-            ban_file = os.path.join(ban_manager.bans_dir, f'{user_id}_ban.json')
-            
-            with open(ban_file, 'r', encoding='utf-8') as f:
-                ban_data = json.loads(f.read())
+        async def run_bans_check():
+            while True:
+                try:
+                    await ban_manager.check_bans()
+                except Exception as e:
+                    logger.error(f"setup_hook: Ошибка в задаче проверки банов: {e}")
+                    await asyncio.sleep(30)
 
-            if ban_data['duration'] is None:
-                unban_text = "Перманентный бан"
-            else:
-                ban_time = datetime.fromisoformat(ban_data['timestamp'])
-                duration = timedelta(**ban_data['duration'])
-                unban_date = (ban_time + duration).strftime('%Y-%m-%d %H:%M:%S')
-                unban_text = f"Дата разблокировки: {unban_text}"
+    if not hasattr(self, 'reminder_task') or self.reminder_task is None:
+        self.reminder_task = asyncio.create_task(run_reminders_check())
 
-            return True, f":x: Вам заблокирован доступ к использованию этим ботом!\n**Причина**: {reason}\n{unban_text}"
-
-        return False, None
+    if not hasattr(self, 'ban_cleanup_task') or self.ban_cleanup_task is None:
+        self.ban_cleanup_task = asyncio.create_task(run_bans_check())
 
     async def process_request(self, query, user_id: int, request_type="search"):
         self.user_id = user_id
@@ -342,10 +344,6 @@ class DiscordClient(discord.Client):
             logger.exception(f"send_start_prompt: Ошибка при отправке промта: {e}")
 
     async def handle_response(self, user_id: int, user_message: str, request_type: str = None) -> str:
-        if user_id:
-            is_banned, ban_message = await self.check_user_ban(user_id)
-            if is_banned:
-                return ban_message
 
         try:
             user_data = await self.load_user_data(user_id)
