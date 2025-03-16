@@ -1,7 +1,11 @@
 import re
+import os
+from discord import Embed
 
 async def send_split_message(self, response: str, message):
-    char_limit = 1900
+    char_limit = 1900  # Лимит для обычных сообщений
+    embed_char_limit = 4096  # Лимит для поля Embed
+    total_embed_limit = 6000  # Общий лимит для Embed
 
     if hasattr(message, 'followup'):
         send_method = message.followup.send
@@ -27,8 +31,42 @@ async def send_split_message(self, response: str, message):
         
         return [f"```{lang}\n{chunk}```" for chunk in code_chunks]
 
+    def extract_thinking(response):
+        think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
+        reasoning_pattern = re.compile(r'Started reasoning...(.*?)Done in \d+s\.', re.DOTALL)
+
+        think_match = think_pattern.search(response)
+        reasoning_match = reasoning_pattern.search(response)
+
+        if think_match:
+            thinking_text = think_match.group(1).strip()
+            response = think_pattern.sub('', response).strip()
+            return thinking_text, response
+        elif reasoning_match:
+            thinking_text = reasoning_match.group(1).strip()
+            response = reasoning_pattern.sub('', response).strip()
+            return thinking_text, response
+        else:
+            return None, response
+
+    async def send_embed_message(thinking_text):
+        thinking_chunks = [thinking_text[i:i + embed_char_limit] for i in range(0, len(thinking_text), embed_char_limit)]
+
+        for chunk in thinking_chunks:
+            embed = Embed(
+                title=":brain: Размышления ИИ...",
+                description=chunk,
+                color=0x3498db  # Синий цвет для размышлений
+            )
+            await send_method(embed=embed)
+
     async def smart_send(content):
-        blocks = re.split(r'(```(?:[a-zA-Z]+)?\n.*?```)', content, flags=re.DOTALL)
+        thinking_text, response = extract_thinking(content)
+
+        if thinking_text:
+            await send_embed_message(thinking_text)
+
+        blocks = re.split(r'(```(?:[a-zA-Z]+)?\n.*?```)', response, flags=re.DOTALL)
         
         current_chunk = ""
         messages_to_send = []

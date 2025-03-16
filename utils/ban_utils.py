@@ -1,5 +1,7 @@
 import os
 import asyncio
+import discord
+from discord import Embed   # not sure but import embed (temp)
 from datetime import datetime, timedelta
 from utils.files_utils import read_json, write_json
 from src.log import logger
@@ -16,20 +18,17 @@ class BanManager:
             return
 
         self._ban_cleanup_running = True
-        logger.info("BanManager: Запуск периодической проверки банов...")
+        logger.info("BanManager: Запуск проверки истекших банов...")
 
         try:
-            while True:
-                try:
-                    await self.cleanup_expired_bans()
-                    logger.info("BanManager: Проверка истекших банов завершена.")
-                except Exception as e:
-                    logger.error(f"BanManager: Ошибка при проверке истекших банов: {e}")
-                await asyncio.sleep(3600)  # 1 час
+            await self.cleanup_expired_bans()
+            logger.info("BanManager: Проверка истекших банов завершена.")
+        except Exception as e:
+            logger.error(f"BanManager: Ошибка при проверке истекших банов: {e}")
         finally:
             self._ban_cleanup_running = False
 
-    async def ban_user(self, user_id, reason="Нарушение правил", days=None):
+    async def ban_user(self, user_id, reason="Нарушение правил пользования ботом", days=None):
         ban_file = os.path.join(self.bans_dir, f'{user_id}_ban.json')
 
         ban_data = {
@@ -68,19 +67,36 @@ class BanManager:
         duration = timedelta(**ban_data['duration'])
         return datetime.now() > ban_time + duration
 
-    async def get_ban_message(self, ban_data):
+    async def get_ban_message(self, ban_data, target_user_id, is_self_check):
         reason = ban_data['reason']
+        ban_time = datetime.fromisoformat(ban_data['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+        
         if ban_data['duration'] is None:
-            unban_text = "Перманентный бан"
+            unban_text = "Бан перманентный!"
         else:
-            ban_time = datetime.fromisoformat(ban_data['timestamp'])
             duration = timedelta(**ban_data['duration'])
-            unban_date = (ban_time + duration).strftime('%Y-%m-%d %H:%M:%S')
+            unban_date = (datetime.fromisoformat(ban_data['timestamp']) + duration).strftime('%Y-%m-%d %H:%M:%S')
             unban_text = f"Дата разблокировки: {unban_date}"
 
-        return f":x: Вам заблокирован доступ к использованию этим ботом!\n**Причина**: {reason}\n{unban_text}"
+        if is_self_check:
+            title = "⛔ Вам заблокирован доступ к боту!"
+            description = "Вы были забанены за нарушение правил."
+        else:
+            title = f"⛔ Пользователь {target_user_id} забанен!"
+            description = f"Пользователь {target_user_id} был забанен за нарушение правил."
 
-    async def is_user_banned(self, user_id):
+        return {
+            "title": title,
+            "description": description,
+            "fields": [
+                {"name": "Причина", "value": reason, "inline": False},
+                {"name": "Дата бана", "value": ban_time, "inline": True},
+                {"name": "Срок бана", "value": unban_text, "inline": True}
+            ],
+            "color": 0xff0000  # Красный цвет для бана
+        }
+
+    async def is_user_banned(self, user_id, is_self_check=True):
         ban_file = os.path.join(self.bans_dir, f'{user_id}_ban.json')
         
         if not os.path.exists(ban_file):
@@ -96,19 +112,33 @@ class BanManager:
             os.remove(ban_file)
             return False, None
 
-        ban_message = await self.get_ban_message(ban_data)
-        return True, ban_message
+        return True, await self.get_ban_message(ban_data, user_id, is_self_check)
 
     async def check_ban_and_respond(self, interaction):
         try:
-            is_banned, ban_message = await self.is_user_banned(interaction.user.id)
+            is_banned, ban_data = await self.is_user_banned(interaction.user.id, is_self_check=True)
             if is_banned:
-                await interaction.response.send_message(ban_message, ephemeral=True)
+                embed = discord.Embed(
+                    title=ban_data["title"],
+                    description=ban_data["description"],
+                    color=ban_data["color"]
+                )
+
+                for field in ban_data["fields"]:
+                    embed.add_field(name=field["name"], value=field["value"], inline=field.get("inline", False))
+
+                if interaction.response.is_done():
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
                 return True
             return False
         except Exception as e:
             logger.error(f"check_ban_and_respond: Ошибка при проверке бана пользователя {interaction.user.id}: {e}")
-            await interaction.response.send_message("> :x: **ОШИБКА:** Не удалось проверить ваш статус бана. Пожалуйста, попробуйте позже.", ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось проверить ваш статус бана. Пожалуйста, попробуйте позже.", ephemeral=True)
+            else:
+                await interaction.response.send_message("> :x: **ОШИБКА:** Не удалось проверить ваш статус бана. Пожалуйста, попробуйте позже.", ephemeral=True)
             return True
 
     async def get_banned_users(self, admin_id):

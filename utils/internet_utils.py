@@ -9,7 +9,6 @@ from src.log import logger
 class HTMLTooLargeError(Exception):
     pass
 
-# Константы настройки
 MAX_RESULTS = 5
 REQUEST_TIMEOUT = 15
 MAX_PARAGRAPHS = 10

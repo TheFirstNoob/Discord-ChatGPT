@@ -9,17 +9,17 @@ import mimetypes
 import fitz  # PyMuPDF
 
 import discord
-from discord import app_commands, Attachment
+from discord import app_commands, Attachment, Embed
 
 from datetime import datetime, timedelta
 from typing import Optional
 
 # local
+import utils.reminder_utils as reminders_utils
 from src.locale_manager import locale_manager as lm # For locale later
 from src.log import logger
 from src.aclient import discordClient
-from utils.files_utils import read_file, write_file
-from utils.reminder_utils import reminder_manager
+from utils.files_utils import read_file, write_file, read_json, write_json
 from utils.ban_utils import ban_manager
 
 # g4f
@@ -168,14 +168,14 @@ async def run_discord_bot():
     @app_commands.choices(model=[
         app_commands.Choice(name="GPT 4o-Mini (OpenAI)", value="gpt-4o-mini"),
         app_commands.Choice(name="GPT 4o (OpenAI)", value="gpt-4o"),
-        app_commands.Choice(name="o3-Mini low (OpenAI)", value="o3-mini-low"),
-        app_commands.Choice(name="o3-Mini (OpenAI)", value="o3-mini"),
-        #app_commands.Choice(name="Claude 3.5 Sonnet (Anthropic)", value="claude-3.5-sonnet"),
+        app_commands.Choice(name="o3-Mini Thinking (OpenAI)", value="o3-mini"),
         app_commands.Choice(name="Blackbox (Blackbox AI)", value="blackboxai"),
+        #app_commands.Choice(name="Claude 3 Haiku (Anthropic)", value="claude-3-haiku"), # working. i disable for new models space
+        app_commands.Choice(name="Claude 3.7 Sonnet (Anthropic)", value="claude-3.7-sonnet"),
+        app_commands.Choice(name="Gemini 1.5 Pro (Google)", value="gemini-1.5-pro"),
         app_commands.Choice(name="Gemini 1.5 Flash (Google)", value="gemini-1.5-flash"),
         app_commands.Choice(name="Gemini 2.0 Flash (Google)", value="gemini-2.0-flash"),
         app_commands.Choice(name="Gemini 2.0 Flash Thinking (Google)", value="gemini-2.0-flash-thinking"),
-        #app_commands.Choice(name="Gemini 1.5 Pro (Google)", value="gemini-pro"),
         app_commands.Choice(name="Command R+ (Cohere)", value="command-r-plus"),
         app_commands.Choice(name="Command R7B+ (Cohere)", value="command-r7b-12-2024"),
         app_commands.Choice(name="LLaMa v3.1 405B (MetaAI)", value="llama-3.1-405b"),
@@ -184,13 +184,14 @@ async def run_discord_bot():
         app_commands.Choice(name="QwQ 32B Thinking (Qwen Team)", value="qwq-32b"),
         app_commands.Choice(name="QvQ 72B Vision (Qwen Team)", value="qwen-qvq-72b-preview"),
         app_commands.Choice(name="Qwen 2.5 72B (Qwen Team)", value="qwen-2.5-72b"),
+        app_commands.Choice(name="Qwen 2.5 1M-Demo (Qwen Team)", value="qwen-2.5-1m-demo"),
         app_commands.Choice(name="Qwen 2.5 Coder 32B (Qwen Team)", value="qwen-2.5-coder-32b"),
         app_commands.Choice(name="DeepSeek LLM 67B (DeepSeek AI)", value="deepseek-chat"),
         app_commands.Choice(name="DeepSeek v3 (DeepSeek AI)", value="deepseek-v3"),
         app_commands.Choice(name="DeepSeek R1 Thinking (DeepSeek AI)", value="deepseek-r1"),
-        app_commands.Choice(name="Nemotron 70B Llama (Nvidia)", value="nemotron-70b"),
+        #app_commands.Choice(name="Nemotron 70B Llama (Nvidia)", value="nemotron-70b"), # working. i disable for new models space
         app_commands.Choice(name="GLM-4 230B (GLM Team)", value="glm-4"),
-        app_commands.Choice(name="Mixtral-8x7B (Mistral)", value="mixtral-8x7b"),
+        app_commands.Choice(name="Mixtral Small 24B (Mistral)", value="mixtral-small-24b"),
         app_commands.Choice(name="Phi 3.5 Mini (Microsoft)", value="phi-3.5-mini"),
     ])
     async def chat_model(
@@ -269,6 +270,7 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
     @app_commands.choices(version=[
+        app_commands.Choice(name="4.5.0", value="4.5.0"),
         app_commands.Choice(name="4.4.0", value="4.4.0"),
         app_commands.Choice(name="4.3.0", value="4.3.0"),
         app_commands.Choice(name="4.2.0", value="4.2.0"),
@@ -468,22 +470,27 @@ async def run_discord_bot():
         user_id = interaction.user.id
         username = str(interaction.user)
 
+        if reminders_utils._scheduler is None:
+            await interaction.followup.send("> :x: **ОШИБКА:** Планировщик напоминаний не инициализирован. Пожалуйста, попробуйте позже.")
+            logger.error(f"remind-add: Планировщик напоминаний не инициализирован для пользователя {username}.")
+            return
+
         try:
-            reminder_time = datetime(year, month, day, hour, minute)
-            reminder_time = reminder_time + timedelta(hours=offset)
+            reminder_time = datetime(year, month, day, hour, minute) + timedelta(hours=offset)
 
             if reminder_time < datetime.now():
                 await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание на время в прошлом.")
                 return
-                
+
             max_future_date = datetime.now() + timedelta(days=365)
             if reminder_time > max_future_date:
                 await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание больше чем на год.")
                 return
 
-            reminder_id = await reminder_manager.add_reminder(user_id, message, reminder_time)
+            reminder_id = await reminders_utils.reminder_manager.add_reminder(user_id, message, reminder_time)
             if reminder_id:
-                await interaction.followup.send(f"> :white_check_mark: **Напоминание установлено на {reminder_time.strftime('%Y-%m-%d %H:%M')}!** \n Вы получите сообщение от меня когда настанет требуемое время :wink:")
+                await reminders_utils._scheduler.add_reminder(user_id, reminder_id, message, reminder_time)
+                await interaction.followup.send(f"> :white_check_mark: **Напоминание установлено на {reminder_time.strftime('%Y-%m-%d %H:%M')}!**")
                 logger.info(f"\x1b[31m{username} установил себе напоминание\x1b[0m")
         except ValueError as ve:
             logger.exception(f"remind: Ошибка при установке напоминания: {str(ve)}")
@@ -493,41 +500,49 @@ async def run_discord_bot():
             await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
 
     @discordClient.tree.command(name="remind-list", description="Показать все ваши напоминания")
-    async def show_reminders(
-        interaction: discord.Interaction
-    ):
+    async def show_reminders(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
         user_id = interaction.user.id
 
-        reminders = await reminder_manager.load_reminders(user_id)
+        reminders = await reminders_utils.reminder_manager.load_reminders(user_id)
         if not reminders:
             await interaction.followup.send("> :warning: **У вас нет активных напоминаний.**")
             return
 
         reminder_list = "\n".join(
-            [f"{index + 1}. {datetime.fromisoformat(reminder['time']).strftime('%Y-%m-%d %H:%M')} - {reminder['message']} (ID: {reminder['id']})"
+            [f"{index + 1}. {datetime.fromisoformat(reminder['time']).strftime('%Y-%m-%d %H:%M')} - {reminder['message']}"
              for index, reminder in enumerate(reminders)]
         )
         await interaction.followup.send(f"> :page_with_curl: **Список напоминаний:**\n{reminder_list}")
         logger.info(f"\x1b[31m{username} запросил список своих напоминаний\x1b[0m")
 
+
     @discordClient.tree.command(name="remind-delete", description="Удалить напоминание")
-    @app_commands.describe(reminder_id="ID напоминания для удаления")
-    async def delete_reminder(
-        interaction: discord.Interaction,
-        reminder_id: str
-    ):
+    @app_commands.describe(reminder_number="Номер напоминания для удаления")
+    async def delete_reminder(interaction: discord.Interaction, reminder_number: int):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         username = str(interaction.user)
 
-        success = await reminder_manager.remove_reminder(user_id, reminder_id)
+        reminders = await reminders_utils.reminder_manager.load_reminders(user_id)
+        if not reminders:
+            await interaction.followup.send("> :warning: **У вас нет активных напоминаний.**")
+            return
+
+        if reminder_number < 1 or reminder_number > len(reminders):
+            await interaction.followup.send("> :x: **ОШИБКА:** Неверный номер напоминания.")
+            return
+
+        reminder_id = reminders[reminder_number - 1]['id']
+        success = await reminders_utils.reminder_manager.remove_reminder(user_id, reminder_id)
         if success:
-            await interaction.followup.send(f"> :white_check_mark: **Напоминание удалено!**")
-            logger.info(f"\x1b[31m{username} удалил напоминание с ID {reminder_id}\x1b[0m")
+            if reminders_utils._scheduler:
+                await reminders_utils._scheduler.remove_reminder(user_id, reminder_id)
+            await interaction.followup.send(f"> :white_check_mark: **Напоминание {reminder_number} удалено!**")
+            logger.info(f"\x1b[31m{username} удалил напоминание с номером {reminder_number}\x1b[0m")
         else:
-            await interaction.followup.send("> :x: **ОШИБКА:** Не удалось удалить напоминание. Проверьте правильность ID.")
+            await interaction.followup.send("> :x: **ОШИБКА:** Не удалось удалить напоминание.")
 
     @discordClient.tree.command(name="ban", description="Забанить пользователя")
     @app_commands.describe(
@@ -538,7 +553,7 @@ async def run_discord_bot():
     async def ban_user(
         interaction: discord.Interaction, 
         user_id: str,  # it should be int but discord bug?
-        reason: Optional[str] = "Нарушение правил",
+        reason: Optional[str] = "Нарушение правил пользования ботом",
         days: Optional[int] = None
     ):
         await interaction.response.defer(ephemeral=True)
@@ -604,30 +619,27 @@ async def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
 
         target_user_id = int(user_id) if user_id else interaction.user.id
+        is_self_check = (target_user_id == interaction.user.id)
 
         try:
-            is_banned, reason = await ban_manager.is_user_banned(target_user_id)
+            is_banned, ban_data = await ban_manager.is_user_banned(target_user_id, is_self_check)
 
             if is_banned:
-                ban_file = os.path.join(ban_manager.bans_dir, f'{target_user_id}_ban.json')
-                ban_data = await read_json(ban_file)
-                ban_time = datetime.fromisoformat(ban_data['timestamp'])
-                duration = ban_data['duration']
-
-                if duration:
-                    unban_time = ban_time + timedelta(**duration)
-                    unban_text = f"**Дата разбана:** {unban_time.strftime('%Y-%m-%d %H:%M:%S')}"
-                else:
-                    unban_text = "**Бан перманентный!**"
-
-                await interaction.followup.send(
-                    f"> :x: **Пользователю {target_user_id} запрещен доступ к боту!**\n"
-                    f"**Причина:** {reason}\n"
-                    f"**Дата бана:** {ban_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    f"{unban_text}"
+                embed = discord.Embed(
+                    title=ban_data["title"],
+                    description=ban_data["description"],
+                    color=ban_data["color"]
                 )
+
+                for field in ban_data["fields"]:
+                    embed.add_field(name=field["name"], value=field["value"], inline=field.get("inline", False))
+
+                await interaction.followup.send(embed=embed)
             else:
-                await interaction.followup.send(f"> :white_check_mark: **Пользователь {target_user_id} не забанен и может пользоваться ботом. **")
+                if is_self_check:
+                    await interaction.followup.send(f"> :white_check_mark: **Вы не забанены и можете пользоваться ботом.**")
+                else:
+                    await interaction.followup.send(f"> :white_check_mark: **Пользователь {target_user_id} не забанен и может пользоваться ботом.**")
         except Exception as e:
             logger.error(f"ban_info: Ошибка при получении информации о бане для пользователя {target_user_id}: {e}")
             await interaction.followup.send(
@@ -635,7 +647,7 @@ async def run_discord_bot():
                 f"```\n{str(e)}\n```"
             )
 
-    @discordClient.tree.command(name="banned-list", description="Список забаненных пользователей")
+    @discordClient.tree.command(name="ban-list", description="Список забаненных пользователей")
     async def list_banned_users(
         interaction: discord.Interaction
     ):
@@ -656,7 +668,7 @@ async def run_discord_bot():
             for user in banned_users
         ])
 
-        logger.info(f"Администратор {user_id} запросил список забаненных")
+        logger.info(f"Администратор {interaction.user.id} запросил список забаненных")
         await interaction.followup.send(f"### Забаненные пользователи:\n{banned_list}")
 
     @discordClient.event
