@@ -27,7 +27,7 @@
 * 🧠 **AI Usage:** Most of the modified code is written with the help of ChatGPT and other AIs for experimentation.
 * 💬 **Multifunctionality:** The bot can communicate both in a Discord channel and in private messages. You can use both slash commands and @ mentions.
 * 🌐 **Internet Support:** The bot can perform search queries, find images, and videos using the **[duckduckgo-search](https://github.com/deedy5/duckduckgo_search)** library.
-* 📝 **Working with PDF:** The bot can analyze your PDF file for text content and interact with it using the **[pdfminer.six](https://github.com/pdfminer/pdfminer.six)** library. (Does not support images!)
+* 📝 **Working with PDF:** The bot can analyze your PDF file for text content and interact with it using the **[PyMuPDF](https://github.com/pymupdf/PyMuPDF)** library. (Does not support images!)
 * 🔔 **Reminders:** The bot can remind you about important events such as Exams, sessions, Deadlines, and etc. Both current reminders and notifications about overdue reminds are supported.
 * 🔨 **Admin Tool:** The administrator can manage access to the bot for each user.
 * 🔑 **Encryption Support: Advanced data protection using Fernet encryption, ensuring confidentiality of user interactions and personal data.
@@ -132,7 +132,7 @@
 6. Copy the generated link and follow it.
 7. Invite the bot to your Discord server.
 8. Create a system chat channel and right-click to copy the channel ID.
-9. Insert the channel ID into `.env` in the line: `DISCORD_CHANNEL_ID`.
+9. Insert the channel ID into `.env` in the line: `DISCORD_CHANNEL_ID` (if needed - optional).
 10. Customize the initial prompt to your liking in the `system_prompt.txt` file.
 11. Adjust other parameters in `.env` if needed.
 
@@ -164,6 +164,7 @@
 | `/help`        | Display the list of commands                 |
 | `/about `      | Information about the project                |
 | `/changelog`   | Information about changes                    |
+| `/ban-info`    | Information about user ban status            |
 
 ### Reminders
 | Command           | Description                |
