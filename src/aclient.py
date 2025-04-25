@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from dotenv import load_dotenv
@@ -663,29 +664,36 @@ class DiscordClient(discord.Client):
         Returns:
             User data dictionary
         """
+
         if self.cache_enabled and user_id is not None:
-            cached_data = self.user_cache.get(user_id)
-            if cached_data:
-                return cached_data
+            cached = self.user_cache.get(user_id)
+            if cached:
+                return cached
 
         filepath = await self.get_user_data_filepath(user_id, channel_id)
-        if self.encrypt_user_data:
+        data = None
+
+        try:
+            raw = await read_file(filepath)
+            if not raw:
+                raise FileNotFoundError(lm.get('error_empty_file'))
+
             try:
-                encrypted_data = await read_file(filepath)
-                if not encrypted_data:
-                    raise FileNotFoundError(lm.get('error_empty_file'))
+                data = json.loads(raw)
+            except json.JSONDecodeError:
                 encryptor = await UserDataEncryptor(user_id, channel_id).initialize()
-                data = await encryptor.decrypt(encrypted_data)
-                if not data:
+                data = await encryptor.decrypt(raw)
+                if data is None:
                     raise ValueError(lm.get('error_decryption_failed'))
-            except Exception as e:
-                logger.error(lm.get('log_load_data_error').format(error=e))
-                data = None
-        else:
-            data = await read_json(filepath)
+        except Exception as e:
+            logger.error(lm.get('log_load_data_error').format(error=e))
+            data = None
 
         if not data:
-            instruction = await self.load_instruction_from_file(SYSTEM_INSTRUCTION_FILE) if self.apply_instruction_to_all or user_id is None else ""
+            instruction = ""
+            if self.apply_instruction_to_all or user_id is None:
+                instruction = await self.load_instruction_from_file(SYSTEM_INSTRUCTION_FILE)
+
             data = {
                 'history': [{'role': 'system', 'content': instruction}] if instruction else [],
                 'model': self.default_model,
@@ -693,6 +701,7 @@ class DiscordClient(discord.Client):
             }
             try:
                 await self.save_user_data(user_id, data, channel_id)
+
                 if channel_id is not None and channel_id == int(os.getenv("DISCORD_CHANNEL_ID", "")):
                     logger.info(lm.get('log_new_system_file').format(filepath=filepath))
                 else:
@@ -713,18 +722,26 @@ class DiscordClient(discord.Client):
             data: User data dictionary
             channel_id: Discord channel ID
         """
+
         if not data:
-            logger.error(lm.get('file_write_error').format(filepath=await self.get_user_data_filepath(user_id, channel_id), error="No data to save"))
+            filepath = await self.get_user_data_filepath(user_id, channel_id)
+            logger.error(lm.get('file_write_error').format(filepath=filepath, error="No data to save"))
             return
 
         filepath = await self.get_user_data_filepath(user_id, channel_id)
-        if self.encrypt_user_data:
+
+        should_encrypt = (
+            channel_id is None and self.encrypt_user_data or
+            channel_id is not None and self.encrypt_channels
+        )
+
+        if should_encrypt:
             encryptor = await UserDataEncryptor(user_id, channel_id).initialize()
-            encrypted_data = await encryptor.encrypt(data)
-            if not encrypted_data:
+            raw = await encryptor.encrypt(data)
+            if not raw:
                 logger.error(lm.get('encryption_encrypt_error').format(error="Failed to encrypt data"))
                 return
-            await write_file(filepath, encrypted_data)
+            await write_file(filepath, raw)
         else:
             await write_json(filepath, data)
 

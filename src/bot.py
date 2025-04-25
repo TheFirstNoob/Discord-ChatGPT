@@ -425,56 +425,40 @@ async def run_discord_bot():
 
     @discordClient.tree.command(name="history", description=lm.get('history_description'))
     async def history(interaction: discord.Interaction):
+        """
+        Export the user's message history to a JSON file and send it to the user.
+        
+        Args:
+            interaction: Discord interaction object
+        """
         await interaction.response.defer(ephemeral=True)
-        username = str(interaction.user)
 
         if interaction.user == discordClient.user:
             return
 
-        # Determine if we're in a DM or channel
         is_dm = isinstance(interaction.channel, discord.DMChannel)
         user_id = interaction.user.id
         channel_id = None if is_dm else interaction.channel.id
 
         try:
             user_data = await discordClient.load_user_data(user_id, channel_id)
-            
-            if not user_data or not user_data.get('history'):
-                await interaction.followup.send(lm.get('history_empty'))
+            history_list = user_data.get('history')
+            if not history_list:
+                await interaction.followup.send(lm.get('history_empty'), ephemeral=True)
                 return
 
-            # Create temp directory if it doesn't exist
             temp_dir = 'temp'
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
+            os.makedirs(temp_dir, exist_ok=True)
+            filename = f"history_{channel_id or user_id}.json"
+            temp_filepath = os.path.join(temp_dir, filename)
 
-            # Use only channel_id for channel messages, user_id for DMs
-            temp_filepath = os.path.join(temp_dir, f'history_{channel_id if channel_id else user_id}.json')
-            
-            # Handle encryption based on context
-            if is_dm:
-                # Always decrypt DM data
-                encryptor = await UserDataEncryptor(user_id).initialize()
-                decrypted_data = await encryptor.decrypt(user_data)
-                if not decrypted_data:
-                    raise ValueError(lm.get('error_decryption_failed'))
-                await write_json(temp_filepath, decrypted_data)
-            elif discordClient.encrypt_channels:
-                # Decrypt channel data if encryption is enabled
-                encryptor = await UserDataEncryptor(user_id, channel_id).initialize()
-                decrypted_data = await encryptor.decrypt(user_data)
-                if not decrypted_data:
-                    raise ValueError(lm.get('error_decryption_failed'))
-                await write_json(temp_filepath, decrypted_data)
-            else:
-                # For channels with encryption disabled, just write the data as is
-                await write_json(temp_filepath, user_data)
-            
+            await write_json(temp_filepath, history_list)
+
             try:
                 with open(temp_filepath, 'rb') as file:
                     await interaction.followup.send(
                         lm.get('history_download_success'),
-                        file=discord.File(file, filename=f'history_{channel_id if channel_id else user_id}.json'),
+                        file=discord.File(file, filename=filename),
                         ephemeral=True
                     )
             except Exception as e:
@@ -484,16 +468,14 @@ async def run_discord_bot():
                     ephemeral=True
                 )
             finally:
-                # Clean up temp file
                 if os.path.exists(temp_filepath):
                     os.remove(temp_filepath)
 
-            # Log with appropriate context
             if is_dm:
-                logger.info(lm.get('log_user_history_dm').format(username=username))
+                logger.info(lm.get('log_user_history_dm').format(username=str(interaction.user)))
             else:
                 logger.info(lm.get('log_user_history_channel').format(
-                    username=username,
+                    username=str(interaction.user),
                     channel=interaction.channel.name
                 ))
 
