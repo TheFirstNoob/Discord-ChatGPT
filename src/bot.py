@@ -1,26 +1,24 @@
 import os
-import re
-import json
 import base64
 import asyncio
-import aiohttp
-import aiofiles
 import mimetypes
 import fitz  # PyMuPDF
 
 import discord
-from discord import app_commands, Attachment, Embed
+from discord import app_commands, Attachment, SelectOption, ButtonStyle
+from discord.ui import View, Select, Button
 
 from datetime import datetime, timedelta
 from typing import Optional
 
 # local
 import utils.reminder_utils as reminders_utils
-from src.locale_manager import locale_manager as lm # For locale later
+from src.locale_manager import locale_manager as lm
 from src.log import logger
 from src.aclient import discordClient
-from utils.files_utils import read_file, write_file, read_json, write_json
+from utils.files_utils import read_file, write_json
 from utils.ban_utils import ban_manager
+from utils.encryption_utils import UserDataEncryptor
 
 # g4f
 from g4f.client import AsyncClient
@@ -30,9 +28,11 @@ client = AsyncClient()
 async def run_discord_bot():
     @discordClient.event
     async def on_ready():
-        await discordClient.send_start_prompt()
+        logger.info(lm.get('log_discord_ready'))
+        logger.info(lm.get('log_discord_sync'))
         await discordClient.tree.sync()
-        logger.info(f'{discordClient.user} успешно запущена!')
+        await discordClient.send_start_prompt()
+        logger.info(lm.get('bot_start_log').format(user=discordClient.user))
 
     @discordClient.tree.command(name="ask", description=lm.get('ask_description'))
     @app_commands.describe(
@@ -64,9 +64,14 @@ async def run_discord_bot():
 
         user_id = interaction.user.id
         user_data = await discordClient.load_user_data(user_id)
-        user_model = user_data.get('model', discordClient.default_model)
+        user_data.get('model', discordClient.default_model)
 
-        logger.info(f"\x1b[31m{username}\x1b[0m : /ask [{message}] ({request_type or 'None'}) в ({discordClient.current_channel})")
+        logger.info(lm.get('log_user_ask').format(
+            username=username,
+            message=message,
+            request_type=request_type or 'None',
+            channel=discordClient.current_channel
+        ))
         asyncio.create_task(discordClient.send_message(interaction, message, request_type))
 
     @discordClient.tree.command(name="asklong", description=lm.get('asklong_description'))
@@ -100,7 +105,7 @@ async def run_discord_bot():
         mime_type, _ = mimetypes.guess_type(file.filename)
 
         if mime_type is None or not mime_type.startswith('text/'):
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Поддерживаются только текстовые форматы! Загруженный файл: {file.filename}")
+            await interaction.followup.send(lm.get('asklong_file_error').format(filename=file.filename))
             return
 
         try:
@@ -108,17 +113,23 @@ async def run_discord_bot():
             file_message = file_content.decode('utf-8')
             message = f"{message}\n\n{file_message}"
         except Exception as e:
-            logger.exception(f"asklong: Не удалось прочитать файл: {str(e)}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось прочитать файл. Поддерживаются только текстовые форматы! {str(e)}")
+            logger.exception(lm.get('asklong_read_error_log').format(error=str(e)))
+            await interaction.followup.send(lm.get('asklong_read_error').format(error=str(e)))
             return
 
-        logger.info(f"\x1b[31m{username}\x1b[0m : /asklong [Текст: {message}, Файл: {file.filename}] ({request_type or 'None'}) в ({discordClient.current_channel})")
+        logger.info(lm.get('log_user_asklong').format(
+            username=username,
+            message=message,
+            filename=file.filename,
+            request_type=request_type or 'None',
+            channel=discordClient.current_channel
+        ))
         asyncio.create_task(discordClient.send_message(interaction, message, request_type))
 
-    @discordClient.tree.command(name="askpdf", description="Извлечь текст из PDF-файла и задать вопрос ИИ")
+    @discordClient.tree.command(name="askpdf", description=lm.get('askpdf_description'))
     @app_commands.describe(
-        message="Введите ваш запрос",
-        file="Загрузите PDF-файл для извлечения текста"
+        message=lm.get('askpdf_message_describe'),
+        file=lm.get('askpdf_file_describe')
     )
     async def askpdf(
         interaction: discord.Interaction,
@@ -139,7 +150,7 @@ async def run_discord_bot():
         mime_type, _ = mimetypes.guess_type(file.filename)
 
         if mime_type != 'application/pdf':
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Поддерживается только PDF-файлы! Загруженный файл: {file.filename}")
+            await interaction.followup.send(lm.get('askpdf_file_error').format(filename=file.filename))
             return
 
         try:
@@ -157,76 +168,131 @@ async def run_discord_bot():
             os.remove(pdf_path)
 
             full_message = f"{message}\n\n{extracted_text}"
-            logger.info(f"\x1b[31m{username}\x1b[0m : /askpdf [Текст: {message}, PDF: {file.filename}] в ({discordClient.current_channel})")
+            logger.info(lm.get('askpdf_log').format(
+                username=username,
+                message=message,
+                filename=file.filename,
+                channel=discordClient.current_channel
+            ))
             asyncio.create_task(discordClient.send_message(interaction, full_message, request_type=None))
 
         except Exception as e:
-            logger.exception(f"askpdf: Ошибка при обработке PDF-файла: {e}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
+            logger.exception(lm.get('askpdf_error_log').format(error=str(e)))
+            await interaction.followup.send(lm.get('askpdf_error').format(error=str(e)))
 
-    @discordClient.tree.command(name="chat-model", description="Сменить модель чата")
-    @app_commands.choices(model=[
-        app_commands.Choice(name="GPT 4o-Mini (OpenAI)", value="gpt-4o-mini"),
-        app_commands.Choice(name="GPT 4o (OpenAI)", value="gpt-4o"),
-        app_commands.Choice(name="o3-Mini Thinking (OpenAI)", value="o3-mini"),
-        app_commands.Choice(name="Blackbox (Blackbox AI)", value="blackboxai"),
-        #app_commands.Choice(name="Claude 3 Haiku (Anthropic)", value="claude-3-haiku"), # working. i disable for new models space
-        app_commands.Choice(name="Claude 3.7 Sonnet (Anthropic)", value="claude-3.7-sonnet"),
-        app_commands.Choice(name="Gemini 1.5 Pro (Google)", value="gemini-1.5-pro"),
-        app_commands.Choice(name="Gemini 1.5 Flash (Google)", value="gemini-1.5-flash"),
-        app_commands.Choice(name="Gemini 2.0 Flash (Google)", value="gemini-2.0-flash"),
-        app_commands.Choice(name="Gemini 2.0 Flash Thinking (Google)", value="gemini-2.0-flash-thinking"),
-        app_commands.Choice(name="Command R+ (Cohere)", value="command-r-plus"),
-        app_commands.Choice(name="Command R7B+ (Cohere)", value="command-r7b-12-2024"),
-        app_commands.Choice(name="LLaMa v3.1 405B (MetaAI)", value="llama-3.1-405b"),
-        app_commands.Choice(name="LLaMa v3.2 11B Vision (MetaAI)", value="llama-3.2-11b"),
-        app_commands.Choice(name="LLaMa v3.3 70B (MetaAI)", value="llama-3.3-70b"),
-        app_commands.Choice(name="QwQ 32B Thinking (Qwen Team)", value="qwq-32b"),
-        app_commands.Choice(name="QvQ 72B Vision (Qwen Team)", value="qwen-qvq-72b-preview"),
-        app_commands.Choice(name="Qwen 2.5 72B (Qwen Team)", value="qwen-2.5-72b"),
-        app_commands.Choice(name="Qwen 2.5 1M-Demo (Qwen Team)", value="qwen-2.5-1m-demo"),
-        app_commands.Choice(name="Qwen 2.5 Coder 32B (Qwen Team)", value="qwen-2.5-coder-32b"),
-        app_commands.Choice(name="DeepSeek LLM 67B (DeepSeek AI)", value="deepseek-chat"),
-        app_commands.Choice(name="DeepSeek v3 (DeepSeek AI)", value="deepseek-v3"),
-        app_commands.Choice(name="DeepSeek R1 Thinking (DeepSeek AI)", value="deepseek-r1"),
-        #app_commands.Choice(name="Nemotron 70B Llama (Nvidia)", value="nemotron-70b"), # working. i disable for new models space
-        app_commands.Choice(name="GLM-4 230B (GLM Team)", value="glm-4"),
-        app_commands.Choice(name="Mixtral Small 24B (Mistral)", value="mixtral-small-24b"),
-        app_commands.Choice(name="Phi 3.5 Mini (Microsoft)", value="phi-3.5-mini"),
-    ])
-    async def chat_model(
-        interaction: discord.Interaction,
-        model: app_commands.Choice[str]
-    ):
-        await interaction.response.defer(ephemeral=True)
+    @discordClient.tree.command(name="chat-model", description=lm.get('chat_model_description'))
+    async def chat_model(interaction: discord.Interaction):
+        # Сборка списка моделей: провайдер -> список моделей
+        models = [
+            ("GPT 4o-Mini", "gpt-4o-mini", "OpenAI"),
+            ("GPT 4o", "gpt-4o", "OpenAI"),
+            ("o3-Mini Thinking", "o3-mini", "OpenAI"),
+            ("Claude 3.7 Sonnet", "claude-3.7-sonnet", "Anthropic"),
+            ("Gemini 1.5 Pro", "gemini-1.5-pro", "Google"),
+            ("Gemini 1.5 Flash", "gemini-1.5-flash", "Google"),
+            ("Gemini 2.0 Flash", "gemini-2.0-flash", "Google"),
+            ("Gemini 2.0 Flash Thinking", "gemini-2.0-flash-thinking", "Google"),
+            ("Command R+", "command-r-plus", "Cohere"),
+            ("Command R7B+", "command-r7b-12-2024", "Cohere"),
+            ("LLaMa v3.1 405B", "llama-3.1-405b", "MetaAI"),
+            ("LLaMa v3.2 11B Vision", "llama-3.2-11b", "MetaAI"),
+            ("LLaMa v3.3 70B", "llama-3.3-70b", "MetaAI"),
+            ("QwQ 32B Thinking", "qwq-32b", "Qwen Team"),
+            ("QvQ 72B Vision", "qwen-qvq-72b-preview", "Qwen Team"),
+            ("Qwen 2.5 72B", "qwen-2.5-72b", "Qwen Team"),
+            ("Qwen 2.5 1M-Demo", "qwen-2.5-1m-demo", "Qwen Team"),
+            ("Qwen 2.5 Coder 32B", "qwen-2.5-coder-32b", "Qwen Team"),
+            ("DeepSeek LLM 67B", "deepseek-chat", "DeepSeek AI"),
+            ("DeepSeek v3", "deepseek-v3", "DeepSeek AI"),
+            ("DeepSeek R1 Thinking", "deepseek-r1", "DeepSeek AI"),
+            ("GLM-4 230B", "glm-4", "GLM Team"),
+            ("Mixtral Small 24B", "mixtral-small-24b", "Mistral"),
+            ("Phi 3.5 Mini", "phi-3.5-mini", "Microsoft")
+        ]
+        provider_map = {}
+        for name, value, provider in models:
+            provider_map.setdefault(provider, []).append((name, value))
 
-        user_id = interaction.user.id
-        await discordClient.set_user_model(user_id, model.value)
+        def create_provider_embed():
+            embed = discord.Embed(
+                title=lm.get('chat_model_title'),
+                description=lm.get('chat_model_full_description'),
+                color=discord.Color.blue()
+            )
+            for prov, items in provider_map.items():
+                lines = "\n".join(f"\u2022 {n}" for n, _ in items)
+                embed.add_field(name=f"**{prov}**", value=lines or "—", inline=False)
+            return embed
 
-        selected_provider = await discordClient.get_provider_for_model(model.value)
-        discordClient.chatBot = AsyncClient(provider=selected_provider)
+        class ProviderSelect(Select):
+            def __init__(self):
+                options = []
+                for prov in provider_map:
+                    options.append(SelectOption(label=prov, value=prov))
+                super().__init__(placeholder=lm.get('select_provider_placeholder'), min_values=1, max_values=1, options=options)
 
-        await interaction.followup.send(f"> :white_check_mark: **УСПЕШНО:** Чат-модель изменена на: **{model.name}**")
-        logger.info(f"Смена модели на {model.name} для пользователя {interaction.user}")
+            async def callback(self, interaction: discord.Interaction):
+                selected = self.values[0]
+                models_for = provider_map[selected]
+                model_lines = "\n".join(f"\u2022 {n}" for n, _ in models_for)
 
-    @discordClient.tree.command(name="instruction-set", description="Установить инструкцию для ИИ")
-    @app_commands.describe(instruction="Инструкция для ИИ")
+                model_embed = discord.Embed(
+                    title=f"{lm.get('chat_model_choose_model')} {selected}",
+                    description=model_lines,
+                    color=discord.Color.purple()
+                )
+
+                class ModelSelect(Select):
+                    def __init__(self):
+                        opts = [SelectOption(label=n, value=v) for n, v in models_for]
+                        super().__init__(placeholder=lm.get('select_model_placeholder'), min_values=1, max_values=1, options=opts)
+
+                    async def callback(self, model_inter: discord.Interaction):
+                        model = self.values[0]
+                        await discordClient.set_user_model(model_inter.user.id, model)
+                        success_embed = discord.Embed(
+                            title=lm.get('chat_model_success').format(model=model),
+                            color=discord.Color.green()
+                        )
+                        button = Button(label=lm.get('chat_model_change_button'), style=ButtonStyle.secondary)
+
+                        async def back_callback(back_inter: discord.Interaction):
+                            view = View()
+                            view.add_item(ProviderSelect())
+                            await back_inter.response.edit_message(embed=create_provider_embed(), view=view, content=None)
+
+                        button.callback = back_callback
+                        view = View()
+                        view.add_item(button)
+                        await model_inter.response.edit_message(embed=success_embed, view=view, content=None)
+                        logger.info(lm.get('chat_model_log').format(user=model_inter.user, model=model))
+
+                view = View()
+                view.add_item(ModelSelect())
+                await interaction.response.edit_message(embed=model_embed, view=view, content=None)
+
+        view = View()
+        view.add_item(ProviderSelect())
+        await interaction.response.send_message(embed=create_provider_embed(), view=view, ephemeral=True)
+
+    @discordClient.tree.command(name="instruction-set", description=lm.get('instruction_set_description'))
+    @app_commands.describe(instruction=lm.get('instruction_set_describe'))
     async def instruction_set(interaction: discord.Interaction, instruction: str):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         await discordClient.set_user_instruction(user_id, instruction)
-        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Инструкция установлена!")
-        logger.info(f"Пользователь {interaction.user} установил инструкцию.")
+        await interaction.followup.send(lm.get('instruction_set_success'))
+        logger.info(lm.get('instruction_set_log').format(user=interaction.user))
 
-    @discordClient.tree.command(name="instruction-reset", description="Сбросить инструкцию для ИИ")
+    @discordClient.tree.command(name="instruction-reset", description=lm.get('instruction_reset_description'))
     async def instruction_reset(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         await discordClient.reset_user_instruction(user_id)
-        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Инструкция сброшена!")
-        logger.info(f"Пользователь {interaction.user} сбросил инструкцию.")
+        await interaction.followup.send(lm.get('instruction_reset_success'))
+        logger.info(lm.get('instruction_reset_log').format(user=interaction.user))
 
-    @discordClient.tree.command(name="reset", description="Сброс всех параметров и истории диалога")
+    @discordClient.tree.command(name="reset", description=lm.get('reset_description'))
     async def reset(
         interaction: discord.Interaction
     ):
@@ -234,25 +300,60 @@ async def run_discord_bot():
         user_id = interaction.user.id
         await discordClient.reset_conversation_history(user_id)
         await discordClient.reset_user_instruction(user_id)
-        await interaction.followup.send("> :white_check_mark: **УСПЕШНО:** Ваша история и параметры ИИ сброшены!")
-        logger.warning(f"\x1b[31mПользователь {interaction.user} сбросил историю и параметры ИИ.\x1b[0m")
+        await interaction.followup.send(lm.get('reset_success'))
+        logger.warning(lm.get('reset_log').format(user=interaction.user))
 
-    @discordClient.tree.command(name="help", description="Информация как пользоваться ботом")
+    @discordClient.tree.command(name="help", description=lm.get('help_description'))
     async def help_command(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
-        help_file_path = 'texts/help.txt'
         
-        help_text = await read_file(help_file_path)
-        if not help_text:
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Файл help.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
-            logger.error(f"help: Файл справки не найден: {help_file_path}")
-            return
+        embed = discord.Embed(
+            title=lm.get('help_title'),
+            description=lm.get('help_description'),
+            color=discord.Color.blue()
+        )
+        
+        categories = {
+            lm.get('help_category_main'): [
+                (lm.get('help_command_ask'), lm.get('help_command_ask_desc')),
+                (lm.get('help_command_asklong'), lm.get('help_command_asklong_desc')),
+                (lm.get('help_command_askpdf'), lm.get('help_command_askpdf_desc')),
+                (lm.get('help_command_draw'), lm.get('help_command_draw_desc'))
+            ],
+            lm.get('help_category_ai'): [
+                (lm.get('help_command_chat_model'), lm.get('help_command_chat_model_desc')),
+                (lm.get('help_command_instruction_set'), lm.get('help_command_instruction_set_desc')),
+                (lm.get('help_command_instruction_reset'), lm.get('help_command_instruction_reset_desc')),
+                (lm.get('help_command_reset'), lm.get('help_command_reset_desc'))
+            ],
+            lm.get('help_category_reminders'): [
+                (lm.get('help_command_remind_add'), lm.get('help_command_remind_add_desc')),
+                (lm.get('help_command_remind_list'), lm.get('help_command_remind_list_desc')),
+                (lm.get('help_command_remind_delete'), lm.get('help_command_remind_delete_desc'))
+            ],
+            lm.get('help_category_info'): [
+                (lm.get('help_command_help'), lm.get('help_command_help_desc')),
+                (lm.get('help_command_about'), lm.get('help_command_about_desc')),
+                (lm.get('help_command_changelog'), lm.get('help_command_changelog_desc')),
+                (lm.get('help_command_history'), lm.get('help_command_history_desc'))
+            ]
+        }
+        
+        for category, commands in categories.items():
+            command_list = "\n".join([f"**{cmd}** - {desc}" for cmd, desc in commands])
+            embed.add_field(
+                name=f"**{category}**",
+                value=command_list,
+                inline=False
+            )
+        
+        embed.set_footer(text=lm.get('help_footer').format(version=os.environ.get('VERSION_BOT')))
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        logger.info(lm.get('log_user_help').format(username=username))
 
-        await interaction.followup.send(help_text)
-        logger.info(f"\x1b[31m{username} использовал(а) команду help!\x1b[0m")
-
-    @discordClient.tree.command(name="about", description="Информация о боте")
+    @discordClient.tree.command(name="about", description=lm.get('about_description'))
     async def about_command(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
@@ -260,97 +361,148 @@ async def run_discord_bot():
 
         about_text = await read_file(about_file_path)
         if not about_text:
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Файл about.txt не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
-            logger.error(f"about: Файл информации не найден: {about_file_path}")
+            await interaction.followup.send(lm.get('about_error').format(admin=os.environ.get('ADMIN_NAME')))
+            logger.error(lm.get('about_error_log').format(path=about_file_path))
             return
 
         about_text = about_text.format(username=username)
         await interaction.followup.send(about_text)
-        logger.info(f"\x1b[31m{username} использовал(а) команду about!\x1b[0m")
+        logger.info(lm.get('about_log').format(username=username))
 
-    @discordClient.tree.command(name="changelog", description="Журнал изменений бота")
-    @app_commands.choices(version=[
-        app_commands.Choice(name="4.5.0", value="4.5.0"),
-        app_commands.Choice(name="4.4.0", value="4.4.0"),
-        app_commands.Choice(name="4.3.0", value="4.3.0"),
-        app_commands.Choice(name="4.2.0", value="4.2.0"),
-        app_commands.Choice(name="4.1.0", value="4.1.0"),
-        app_commands.Choice(name="4.0.0", value="4.0.0"),
-        app_commands.Choice(name="3.5.1", value="3.5.1"),
-        app_commands.Choice(name="3.5.0", value="3.5.0"),
-        app_commands.Choice(name="3.4.0", value="3.4.0"),
-        app_commands.Choice(name="3.3.2", value="3.3.2"),
-        app_commands.Choice(name="3.3.1", value="3.3.1"),
-        app_commands.Choice(name="3.3.0", value="3.3.0"),
-        app_commands.Choice(name="3.2.0", value="3.2.0"),
-        app_commands.Choice(name="3.1.1", value="3.1.1"),
-        app_commands.Choice(name="3.1.0", value="3.1.0"),
-        app_commands.Choice(name="3.0.0", value="3.0.0"),
-        app_commands.Choice(name="2.6.0", value="2.6.0"),
-        app_commands.Choice(name="2.5.1", value="2.5.1"),
-        app_commands.Choice(name="2.5.0", value="2.5.0"),
-        app_commands.Choice(name="2.4.0", value="2.4.0"),
-        app_commands.Choice(name="2.3.0", value="2.3.0"),
-        app_commands.Choice(name="2.2.0", value="2.2.0"),
-        app_commands.Choice(name="2.1.0", value="2.1.0"),
-        app_commands.Choice(name="2.0.0", value="2.0.0"),
-    ])
-    async def changelog(interaction: discord.Interaction, version: app_commands.Choice[str]):
+    @discordClient.tree.command(name="changelog", description=lm.get('changelog_description'))
+    async def changelog(interaction: discord.Interaction):
+        changelog_dir = "texts/change_log"
+        files = [f[:-4] for f in os.listdir(changelog_dir) if f.endswith('.txt')]
+
+        def version_key(v):
+            return [int(p) if p.isdigit() else p for p in v.split('.')]
+
+        versions = sorted(files, key=version_key, reverse=True)
+        groups = {}
+        for v in versions:
+            major = v.split('.')[0]
+            groups.setdefault(major, []).append(v)
+
+        def create_main_embed():
+            embed = discord.Embed(
+                title=lm.get('changelog_title'),
+                description=lm.get('changelog_full_description'),
+                color=discord.Color.green()
+            )
+            for major in sorted(groups.keys(), key=int, reverse=True):
+                rows = sorted(groups[major], key=version_key, reverse=True)
+                table = f"{lm.get('changelog_versions_list')}:\n```" + "\n".join(rows) + "```"
+                embed.add_field(name=f"**{major}.x.x**", value=table, inline=False)
+            return embed
+
+        def create_main_view():
+            options = [SelectOption(label=v, value=v) for v in versions[:25]]
+
+            class VersionSelect(Select):
+                def __init__(self):
+                    super().__init__(placeholder=lm.get('changelog_description_select'), min_values=1, max_values=1, options=options)
+
+                async def callback(self, interaction: discord.Interaction):
+                    version = self.values[0]
+                    text = await read_file(f"{changelog_dir}/{version}.txt")
+                    detail_embed = discord.Embed(title=lm.get('changelog_version_title').format(version=version), description=text, color=discord.Color.blue())
+                    button = Button(label=lm.get('changelog_back_button'), style=ButtonStyle.secondary)
+
+                    async def back_callback(back_inter: discord.Interaction):
+                        await back_inter.response.edit_message(embed=create_main_embed(), view=create_main_view())
+
+                    button.callback = back_callback
+                    view = View()
+                    view.add_item(button)
+                    await interaction.response.edit_message(embed=detail_embed, view=view)
+                    logger.info(lm.get('changelog_log').format(username=interaction.user, version=version))
+
+            view = View()
+            view.add_item(VersionSelect())
+            return view
+
+        await interaction.response.send_message(embed=create_main_embed(), view=create_main_view(), ephemeral=True)
+
+    @discordClient.tree.command(name="history", description=lm.get('history_description'))
+    async def history(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        username = str(interaction.user)
-        version_file = f"texts/change_log/{version.value}.txt"
-        
-        changelog_text = await read_file(version_file)
-        if not changelog_text:
-            await interaction.followup.send(f"> :x: **ОШИБКА: Файл журнала изменений для версии {version.name} не найден! Пожалуйста, свяжитесь с {os.environ.get('ADMIN_NAME')} и сообщите ему об этой ошибке.**")
-            logger.error(f"changelog: Файл журнала изменений для версии {version.name} не найден: {version_file}")
-            return
-        
-        await interaction.followup.send(changelog_text)
-        logger.info(f"\x1b[31m{username} запросил(а) журнал изменений для версии {version.name} бота\x1b[0m")
-        
-    @discordClient.tree.command(name="history", description="Получить историю сообщений")
-    async def history(
-        interaction: discord.Interaction
-    ):
-        await interaction.response.defer(ephemeral=False)
         username = str(interaction.user)
 
         if interaction.user == discordClient.user:
             return
 
+        # Determine if we're in a DM or channel
+        is_dm = isinstance(interaction.channel, discord.DMChannel)
         user_id = interaction.user.id
+        channel_id = None if is_dm else interaction.channel.id
 
         try:
-            user_data = await discordClient.load_user_data(user_id)
+            user_data = await discordClient.load_user_data(user_id, channel_id)
             
             if not user_data or not user_data.get('history'):
-                await interaction.followup.send("> :x: **ОШИБКА:** История сообщений пуста!")
+                await interaction.followup.send(lm.get('history_empty'))
                 return
 
-            temp_filepath = f'temp_history_{user_id}.json'
+            # Create temp directory if it doesn't exist
+            temp_dir = 'temp'
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
 
-            async with aiofiles.open(temp_filepath, 'w', encoding='utf-8') as f:
-                await f.write(json.dumps(user_data, ensure_ascii=False, indent=4))
-
+            # Use only channel_id for channel messages, user_id for DMs
+            temp_filepath = os.path.join(temp_dir, f'history_{channel_id if channel_id else user_id}.json')
+            
+            # Handle encryption based on context
+            if is_dm:
+                # Always decrypt DM data
+                encryptor = await UserDataEncryptor(user_id).initialize()
+                decrypted_data = await encryptor.decrypt(user_data)
+                if not decrypted_data:
+                    raise ValueError(lm.get('error_decryption_failed'))
+                await write_json(temp_filepath, decrypted_data)
+            elif discordClient.encrypt_channels:
+                # Decrypt channel data if encryption is enabled
+                encryptor = await UserDataEncryptor(user_id, channel_id).initialize()
+                decrypted_data = await encryptor.decrypt(user_data)
+                if not decrypted_data:
+                    raise ValueError(lm.get('error_decryption_failed'))
+                await write_json(temp_filepath, decrypted_data)
+            else:
+                # For channels with encryption disabled, just write the data as is
+                await write_json(temp_filepath, user_data)
+            
             try:
                 with open(temp_filepath, 'rb') as file:
                     await interaction.followup.send(
-                        "> :white_check_mark: **УСПЕШНО:** Ваша история диалога:", 
-                        file=discord.File(file, filename=f'{user_id}_history.json')
+                        lm.get('history_download_success'),
+                        file=discord.File(file, filename=f'history_{channel_id if channel_id else user_id}.json'),
+                        ephemeral=True
                     )
             except Exception as e:
-                logger.error(f"history: Ошибка при отправке файла: {e}")
-                await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось отправить файл. {e}")
+                logger.error(lm.get('history_error_log').format(error=str(e)))
+                await interaction.followup.send(
+                    lm.get('history_download_error').format(error=str(e)),
+                    ephemeral=True
+                )
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_filepath):
+                    os.remove(temp_filepath)
 
-            os.remove(temp_filepath)
-
-            logger.info(f"\x1b[31m{username} запросил(а) историю сообщений с ботом\x1b[0m")
+            # Log with appropriate context
+            if is_dm:
+                logger.info(lm.get('log_user_history_dm').format(username=username))
+            else:
+                logger.info(lm.get('log_user_history_channel').format(
+                    username=username,
+                    channel=interaction.channel.name
+                ))
 
         except Exception as e:
-            logger.error(f"history: Критическая ошибка: {e}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** Не удалось получить историю. {e}")
-    
+            logger.error(lm.get('history_error_log').format(error=str(e)))
+            await interaction.followup.send(
+                lm.get('history_error').format(error=str(e)),
+                ephemeral=True
+            )
 
     async def generate_and_send_image(
         interaction: discord.Interaction, 
@@ -376,33 +528,34 @@ async def run_discord_bot():
     
                     images_data.append(image_path)
                 else:
-                    await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать изображение. Ответ не содержит данных.")
-                    logger.error(f"generate_and_send_image: Не удалось сгенерировать изображение. Ответ не содержит данных.")
+                    await interaction.followup.send(lm.get('draw_generate_empty'))
+                    logger.error(lm.get('draw_generate_error_log'))
+                    return
 
             if images_data:
                 if count > 1:
                     files = [discord.File(image_path, filename=f"image_{i+1}.png") for i, image_path in enumerate(images_data)]
-                    model_message = f":paintbrush: **Изображения от модели**: {model_name}"
+                    model_message = lm.get('draw_images_model_message').format(model=model_name)
                     await interaction.followup.send(model_message, files=files)
                 else:
                     with open(images_data[0], 'rb') as f:
-                        model_message = f":paintbrush: **Изображение от модели**: {model_name}"
+                        model_message = lm.get('draw_image_model_message').format(model=model_name)
                         await interaction.followup.send(model_message, file=discord.File(f, filename=images_data[0]))
                 for image_path in images_data:
                     os.remove(image_path)
             else:
-                await interaction.followup.send("> :x: **ОШИБКА:** Не удалось сгенерировать ни одного изображения.")
-                logger.error(f"generate_and_send_image: Не удалось сгенерировать изображения.")
+                await interaction.followup.send(lm.get('draw_generate_empty'))
+                logger.error(lm.get('draw_generate_empty_log'))
 
         except Exception as e:
-            logger.error(f"generate_and_send_image: Ошибка при выполнении: {str(e)}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
+            logger.error(lm.get('draw_error_log').format(error=str(e)))
+            await interaction.followup.send(lm.get('draw_error').format(error=str(e)))
 
-    @discordClient.tree.command(name="draw", description="Сгенерировать изображение от модели ИИ")
+    @discordClient.tree.command(name="draw", description=lm.get('draw_description'))
     @app_commands.describe(
-        prompt="Введите ваш запрос (На Английском языке)",
-        image_model="Выберите модель для генерации изображения",
-        count="Количество изображений для генерации (необязательно, по умолчанию - 1)"
+        prompt=lm.get('draw_prompt_describe'),
+        image_model=lm.get('draw_model_describe'),
+        count=lm.get('draw_count_describe')
     )
     @app_commands.choices(image_model=[
         app_commands.Choice(name="Stable Diffusion XL", value="sdxl-turbo"),
@@ -436,7 +589,13 @@ async def run_discord_bot():
 
         username = str(interaction.user)
         channel = str(interaction.channel)
-        logger.info(f"\x1b[31m{username}\x1b[0m : /draw [{prompt}] в ({channel}) через [{image_model.value}] Кол-во: [{count}]")
+        logger.info(lm.get('log_user_draw').format(
+            username=username,
+            prompt=prompt,
+            channel=channel,
+            model=image_model.value,
+            count=count
+        ))
 
         await generate_and_send_image(
             interaction, 
@@ -446,15 +605,15 @@ async def run_discord_bot():
             count=count
         )
 
-    @discordClient.tree.command(name="remind-add", description="Создать напоминание")
+    @discordClient.tree.command(name="remind-add", description=lm.get('remind_add_description'))
     @app_commands.describe(
-        day="День (1-31)",
-        month="Месяц (1-12)",
-        year="Год (например, 2023)",
-        hour="Часы (0-23)",
-        minute="Минуты (0-59)",
-        offset="Часовое смещение от времени МСК (например, +3 или -7)",
-        message="Сообщение напоминания"
+        day=lm.get('remind_add_day_describe'),
+        month=lm.get('remind_add_month_describe'),
+        year=lm.get('remind_add_year_describe'),
+        hour=lm.get('remind_add_hour_describe'),
+        minute=lm.get('remind_add_minute_describe'),
+        offset=lm.get('remind_add_offset_describe'),
+        message=lm.get('remind_add_message_describe')
     )
     async def remind(
         interaction: discord.Interaction,
@@ -471,35 +630,35 @@ async def run_discord_bot():
         username = str(interaction.user)
 
         if reminders_utils._scheduler is None:
-            await interaction.followup.send("> :x: **ОШИБКА:** Планировщик напоминаний не инициализирован. Пожалуйста, попробуйте позже.")
-            logger.error(f"remind-add: Планировщик напоминаний не инициализирован для пользователя {username}.")
+            await interaction.followup.send(lm.get('remind_scheduler_error'))
+            logger.error(lm.get('remind_scheduler_error_log').format(username=username))
             return
 
         try:
             reminder_time = datetime(year, month, day, hour, minute) + timedelta(hours=offset)
 
             if reminder_time < datetime.now():
-                await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание на время в прошлом.")
+                await interaction.followup.send(lm.get('remind_past_error'))
                 return
 
             max_future_date = datetime.now() + timedelta(days=365)
             if reminder_time > max_future_date:
-                await interaction.followup.send("> :x: **ОШИБКА:** Вы не можете установить напоминание больше чем на год.")
+                await interaction.followup.send(lm.get('remind_future_error'))
                 return
 
             reminder_id = await reminders_utils.reminder_manager.add_reminder(user_id, message, reminder_time)
             if reminder_id:
                 await reminders_utils._scheduler.add_reminder(user_id, reminder_id, message, reminder_time)
-                await interaction.followup.send(f"> :white_check_mark: **Напоминание установлено на {reminder_time.strftime('%Y-%m-%d %H:%M')}!**")
-                logger.info(f"\x1b[31m{username} установил себе напоминание\x1b[0m")
+                await interaction.followup.send(lm.get('remind_set_success').format(time=reminder_time.strftime('%Y-%m-%d %H:%M')))
+                logger.info(lm.get('log_user_remind').format(username=username))
         except ValueError as ve:
-            logger.exception(f"remind: Ошибка при установке напоминания: {str(ve)}")
-            await interaction.followup.send("> :x: **ОШИБКА:** Неверный формат времени. Пожалуйста, убедитесь, что все значения корректны.")
+            logger.exception(lm.get('log_remind_error').format(error=str(ve)))
+            await interaction.followup.send(lm.get('remind_time_error'))
         except Exception as e:
-            logger.exception(f"remind: Ошибка при установке напоминания: {str(e)}")
-            await interaction.followup.send(f"> :x: **ОШИБКА:** {str(e)}")
+            logger.exception(lm.get('remind_error_log').format(error=str(e)))
+            await interaction.followup.send(lm.get('remind_error').format(error=str(e)))
 
-    @discordClient.tree.command(name="remind-list", description="Показать все ваши напоминания")
+    @discordClient.tree.command(name="remind-list", description=lm.get('remind_list_description'))
     async def show_reminders(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         username = str(interaction.user)
@@ -507,19 +666,18 @@ async def run_discord_bot():
 
         reminders = await reminders_utils.reminder_manager.load_reminders(user_id)
         if not reminders:
-            await interaction.followup.send("> :warning: **У вас нет активных напоминаний.**")
+            await interaction.followup.send(lm.get('remind_list_empty'))
             return
 
         reminder_list = "\n".join(
             [f"{index + 1}. {datetime.fromisoformat(reminder['time']).strftime('%Y-%m-%d %H:%M')} - {reminder['message']}"
              for index, reminder in enumerate(reminders)]
         )
-        await interaction.followup.send(f"> :page_with_curl: **Список напоминаний:**\n{reminder_list}")
-        logger.info(f"\x1b[31m{username} запросил список своих напоминаний\x1b[0m")
+        await interaction.followup.send(lm.get('remind_list_success').format(list=reminder_list))
+        logger.info(lm.get('remind_list_log').format(username=username))
 
-
-    @discordClient.tree.command(name="remind-delete", description="Удалить напоминание")
-    @app_commands.describe(reminder_number="Номер напоминания для удаления")
+    @discordClient.tree.command(name="remind-delete", description=lm.get('remind_delete_description'))
+    @app_commands.describe(reminder_number=lm.get('remind_delete_number_describe'))
     async def delete_reminder(interaction: discord.Interaction, reminder_number: int):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
@@ -527,11 +685,11 @@ async def run_discord_bot():
 
         reminders = await reminders_utils.reminder_manager.load_reminders(user_id)
         if not reminders:
-            await interaction.followup.send("> :warning: **У вас нет активных напоминаний.**")
+            await interaction.followup.send(lm.get('remind_delete_empty'))
             return
 
         if reminder_number < 1 or reminder_number > len(reminders):
-            await interaction.followup.send("> :x: **ОШИБКА:** Неверный номер напоминания.")
+            await interaction.followup.send(lm.get('remind_delete_invalid'))
             return
 
         reminder_id = reminders[reminder_number - 1]['id']
@@ -539,30 +697,34 @@ async def run_discord_bot():
         if success:
             if reminders_utils._scheduler:
                 await reminders_utils._scheduler.remove_reminder(user_id, reminder_id)
-            await interaction.followup.send(f"> :white_check_mark: **Напоминание {reminder_number} удалено!**")
-            logger.info(f"\x1b[31m{username} удалил напоминание с номером {reminder_number}\x1b[0m")
+            await interaction.followup.send(lm.get('remind_delete_success').format(number=reminder_number))
+            logger.info(lm.get('remind_delete_log').format(username=username, number=reminder_number))
         else:
-            await interaction.followup.send("> :x: **ОШИБКА:** Не удалось удалить напоминание.")
+            await interaction.followup.send(lm.get('remind_delete_error'))
 
-    @discordClient.tree.command(name="ban", description="Забанить пользователя")
+    @discordClient.tree.command(name="ban", description=lm.get('ban_description'))
     @app_commands.describe(
-        user_id="ID пользователя, которого нужно забанить",
-        reason="Причина бана (необязательно)",
-        days="Количество дней бана (необязательно, по умолчанию - перманентный бан)"
+        user_id=lm.get('ban_user_describe'),
+        reason=lm.get('ban_reason_describe'),
+        days=lm.get('ban_days_describe')
     )
     async def ban_user(
         interaction: discord.Interaction, 
         user_id: str,  # it should be int but discord bug?
-        reason: Optional[str] = "Нарушение правил пользования ботом",
+        reason: Optional[str] = lm.get('ban_default_reason'),
         days: Optional[int] = None
     ):
         await interaction.response.defer(ephemeral=True)
 
         if interaction.user.id != ban_manager.admin_id:
-            await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
+            await interaction.followup.send(lm.get('no_permission'))
             return
 
-        logger.info(f"ban_user: Попытка бана пользователя {user_id} администратором {interaction.user.id}. Причина: {reason}")
+        logger.info(lm.get('ban_log_attempt').format(
+            user_id=user_id,
+            admin_id=interaction.user.id,
+            reason=reason
+        ))
 
         try:
             await ban_manager.ban_user(
@@ -570,18 +732,15 @@ async def run_discord_bot():
                 reason, 
                 days=days
             )
-            logger.info(f"ban_user: Команда бана для пользователя {user_id} выполнена успешно.")
-            await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно забанен**")
+            logger.info(lm.get('ban_log_success').format(user_id=user_id))
+            await interaction.followup.send(lm.get('ban_success').format(user_id=user_id))
         except Exception as e:
-            logger.error(f"ban_user: Ошибка при выполнении команды бана для пользователя {user_id}: {e}")
-            await interaction.followup.send(
-                f"> :x: **Произошла ошибка при бане:**\n"
-                f"```\n{str(e)}\n```"
-            )
+            logger.error(lm.get('log_ban_error').format(user_id=user_id, error=e))
+            await interaction.followup.send(lm.get('ban_error').format(error=str(e)))
 
-    @discordClient.tree.command(name="unban", description="Разбанить пользователя")
+    @discordClient.tree.command(name="unban", description=lm.get('unban_description'))
     @app_commands.describe(
-        user_id="ID пользователя, которого нужно разбанить"
+        user_id=lm.get('unban_user_describe')
     )
     async def unban_user(
         interaction: discord.Interaction, 
@@ -590,30 +749,30 @@ async def run_discord_bot():
         await interaction.response.defer(ephemeral=True)
 
         if interaction.user.id != ban_manager.admin_id:
-            await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
+            await interaction.followup.send(lm.get('no_permission'))
             return
 
-        logger.info(f"unban_user: Попытка разбана пользователя {user_id} администратором {interaction.user.id}")
+        logger.info(lm.get('unban_log_attempt').format(
+            user_id=user_id,
+            admin_id=interaction.user.id
+        ))
 
         try:
             result = await ban_manager.unban_user(int(user_id))
             if result:
-                await interaction.followup.send(f"> :white_check_mark: **Пользователь {user_id} успешно разбанен**")
+                await interaction.followup.send(lm.get('unban_success').format(user_id=user_id))
             else:
-                await interaction.followup.send(f"> :warning: **Пользователь {user_id} не был забанен**")
+                await interaction.followup.send(lm.get('unban_not_banned').format(user_id=user_id))
         except Exception as e:
-            logger.error(f"unban_user: Ошибка при выполнении команды разбана для пользователя {user_id}: {e}")
-            await interaction.followup.send(
-                f"> :x: **Произошла ошибка при разбане:**\n"
-                f"```\n{str(e)}\n```"
-            )
+            logger.error(lm.get('log_unban_error').format(user_id=user_id, error=e))
+            await interaction.followup.send(lm.get('unban_error').format(error=str(e)))
 
-    @discordClient.tree.command(name="ban-info", description="Проверить блокировку и показать информацию о бане")
+    @discordClient.tree.command(name="ban-info", description=lm.get('ban_info_description'))
     @app_commands.describe(
-        user_id="ID пользователя (необязательно, по умолчанию - Вы)"
+        user_id=lm.get('ban_info_user_describe')
     )
     async def ban_info(
-        interaction: discord.Interaction, 
+        interaction: discord.Interaction,
         user_id: Optional[str] = None
     ):
         await interaction.response.defer(ephemeral=True)
@@ -637,39 +796,38 @@ async def run_discord_bot():
                 await interaction.followup.send(embed=embed)
             else:
                 if is_self_check:
-                    await interaction.followup.send(f"> :white_check_mark: **Вы не забанены и можете пользоваться ботом.**")
+                    await interaction.followup.send(lm.get('ban_info_not_banned_self'))
                 else:
-                    await interaction.followup.send(f"> :white_check_mark: **Пользователь {target_user_id} не забанен и может пользоваться ботом.**")
+                    await interaction.followup.send(lm.get('ban_info_not_banned_other').format(user_id=target_user_id))
         except Exception as e:
-            logger.error(f"ban_info: Ошибка при получении информации о бане для пользователя {target_user_id}: {e}")
+            logger.error(lm.get('ban_info_error_log').format(user_id=target_user_id, error=e))
             await interaction.followup.send(
-                f"> :x: **Произошла ошибка при получении информации о бане:**\n"
-                f"```\n{str(e)}\n```"
+                lm.get('ban_info_error').format(error=str(e))
             )
 
-    @discordClient.tree.command(name="ban-list", description="Список забаненных пользователей")
+    @discordClient.tree.command(name="ban-list", description=lm.get('ban_list_description'))
     async def list_banned_users(
         interaction: discord.Interaction
     ):
         await interaction.response.defer(ephemeral=True)
 
         if interaction.user.id != ban_manager.admin_id:
-            await interaction.followup.send("> :x: **У вас нет прав для этой команды!**")
+            await interaction.followup.send(lm.get('no_permission'))
             return
 
         banned_users = await ban_manager.get_banned_users(interaction.user.id)
 
         if not banned_users:
-            await interaction.followup.send("> :white_check_mark: **Нет забаненных пользователей.**")
+            await interaction.followup.send(lm.get('ban_list_empty'))
             return
 
         banned_list = "\n".join([
-            f"**ID:** {user['user_id']}, **Причина:** {user['reason']}" 
+            lm.get('ban_list_item').format(user_id=user['user_id'], reason=user['reason'])
             for user in banned_users
         ])
 
-        logger.info(f"Администратор {interaction.user.id} запросил список забаненных")
-        await interaction.followup.send(f"### Забаненные пользователи:\n{banned_list}")
+        logger.info(lm.get('ban_list_log').format(admin_id=interaction.user.id))
+        await interaction.followup.send(lm.get('ban_list_success').format(list=banned_list))
 
     @discordClient.event
     async def on_message(message):
@@ -682,7 +840,11 @@ async def run_discord_bot():
             if clean_message:
                 discordClient.current_channel = message.channel
 
-                logger.info(f"\x1b[31m{message.author}\x1b[0m : Упоминание бота [{clean_message}] в ({message.channel})")
+                logger.info(lm.get('log_bot_mention').format(
+                    username=message.author,
+                    message=clean_message,
+                    channel=message.channel
+                ))
                 asyncio.create_task(discordClient.send_message(message, clean_message, None))
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")

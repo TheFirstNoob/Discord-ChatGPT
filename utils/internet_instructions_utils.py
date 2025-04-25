@@ -1,22 +1,10 @@
+from src.locale_manager import locale_manager as lm
+
 def get_web_search_instruction(result):
-    return (
-        "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИНФОРМАЦИЮ ИЗ ИНТЕРНЕТА. "
-        "ОБРАБОТАЙ ПОЛУЧЕННУЮ ИНФОРМАЦИЮ, ОТВЕТЬ КАК СЧИТАЕШЬ ПРАВИЛЬНЫМ И БЕЗОПАСНЫМ, "
-        "ВСЕГДА УКАЗЫВАЙ ПОЛУЧЕННЫЕ ИСТОЧНИКИ, ЕСЛИ НЕ МОЖЕШЬ ОТВЕТИТЬ ИЗ ПОЛУЧЕННЫХ ДАННЫХ САЙТА ИЛИ НА САЙТЕ ОШИБКИ ИЛИ ОГРАНИЧЕНИЯ,"
-        "ТО СООБЩИ ОБ ЭТОМ, ЧТО МАЛО ИНФОРМАЦИИ ИЛИ ИМЕЮТСЯ ПРОБЛЕМЫ НА СТОРОНЕ САЙТА!]: "
-        f"Результат поиска: {result}"
-    )
+    return lm.get('web_search_instruction').format(result=result)
 
 def get_image_search_instruction(result):
-    return (
-        "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ИЗОБРАЖЕНИЯ. "
-        "ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА."
-        f"Результат поиска: {result}"
-    )
+    return lm.get('image_search_instruction').format(result=result)
 
 def get_video_search_instruction(result):
-    return (
-        "[СИСТЕМНАЯ ИНСТРУКЦИЯ] ПОЛЬЗОВАТЕЛЬ ЗАПРОСИЛ ВИДЕО. "
-        "ПРОСТО ОТПРАВЬ ЕМУ ПОЛУЧЕННЫЕ ССЫЛКИ И ОТВЕТЬ В РАМКАХ ЕГО ЗАПРОСА."
-        f"Результат поиска: {result}"
-    )
+    return lm.get('video_search_instruction').format(result=result)

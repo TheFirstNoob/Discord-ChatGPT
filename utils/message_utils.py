@@ -1,26 +1,48 @@
 import re
-import os
-from discord import Embed
+from typing import List, Tuple, Optional, Union
+from discord import Embed, Message, Interaction
+from src.locale_manager import locale_manager as lm
 
-async def send_split_message(self, response: str, message):
-    char_limit = 1900  # Лимит для обычных сообщений
-    embed_char_limit = 4096  # Лимит для поля Embed
-    total_embed_limit = 6000  # Общий лимит для Embed
+# Constants
+CHAR_LIMIT = 1900  # Limit for regular messages
+EMBED_CHAR_LIMIT = 4096  # Limit for Embed field
+CODE_BLOCK_PATTERN = r'```([a-zA-Z]*)\n(.*?)```'
+THINKING_PATTERN = re.compile(r'<think>(.*?)</think>', re.DOTALL)
+REASONING_PATTERN = re.compile(r'Started reasoning...(.*?)Done in \d+s\.', re.DOTALL)
 
+async def send_split_message(self, response: str, message: Union[Message, Interaction]) -> None:
+    """
+    Split and send a message that might exceed Discord's character limits.
+    
+    Args:
+        response: The message content to send
+        message: Discord message or interaction object
+    """
+    # Determine the appropriate send method
     if hasattr(message, 'followup'):
         send_method = message.followup.send
     elif hasattr(message, 'channel'):
         send_method = message.channel.send
     else:
-        raise AttributeError("send_split_message: Неподдерживаемый тип объекта для отправки сообщения")
+        raise AttributeError(lm.get('message_send_error'))
 
-    def split_code_block(lang, code_content):
+    def split_code_block(lang: str, code_content: str) -> List[str]:
+        """
+        Split code content into chunks that fit within Discord's character limit.
+        
+        Args:
+            lang: Programming language for syntax highlighting
+            code_content: Code content to split
+        
+        Returns:
+            List of code blocks with proper formatting
+        """
         code_lines = code_content.split('\n')
         code_chunks = []
         current_chunk = ""
 
         for line in code_lines:
-            if len(current_chunk) + len(line) + len(lang) + 10 > char_limit:
+            if len(current_chunk) + len(line) + len(lang) + 10 > CHAR_LIMIT:
                 code_chunks.append(current_chunk)
                 current_chunk = line + "\n"
             else:
@@ -31,36 +53,57 @@ async def send_split_message(self, response: str, message):
         
         return [f"```{lang}\n{chunk}```" for chunk in code_chunks]
 
-    def extract_thinking(response):
-        think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
-        reasoning_pattern = re.compile(r'Started reasoning...(.*?)Done in \d+s\.', re.DOTALL)
-
-        think_match = think_pattern.search(response)
-        reasoning_match = reasoning_pattern.search(response)
+    def extract_thinking(response: str) -> Tuple[Optional[str], str]:
+        """
+        Extract thinking/reasoning content from the response.
+        
+        Args:
+            response: Full response text
+        
+        Returns:
+            Tuple of (thinking text, remaining response)
+        """
+        think_match = THINKING_PATTERN.search(response)
+        reasoning_match = REASONING_PATTERN.search(response)
 
         if think_match:
             thinking_text = think_match.group(1).strip()
-            response = think_pattern.sub('', response).strip()
+            response = THINKING_PATTERN.sub('', response).strip()
             return thinking_text, response
         elif reasoning_match:
             thinking_text = reasoning_match.group(1).strip()
-            response = reasoning_pattern.sub('', response).strip()
+            response = REASONING_PATTERN.sub('', response).strip()
             return thinking_text, response
         else:
             return None, response
 
-    async def send_embed_message(thinking_text):
-        thinking_chunks = [thinking_text[i:i + embed_char_limit] for i in range(0, len(thinking_text), embed_char_limit)]
+    async def send_embed_message(thinking_text: str) -> None:
+        """
+        Send thinking content as an embed message.
+        
+        Args:
+            thinking_text: Thinking content to send
+        """
+        thinking_chunks = [
+            thinking_text[i:i + EMBED_CHAR_LIMIT]
+            for i in range(0, len(thinking_text), EMBED_CHAR_LIMIT)
+        ]
 
         for chunk in thinking_chunks:
             embed = Embed(
-                title=":brain: Размышления ИИ...",
+                title=lm.get('message_ai_thinking'),
                 description=chunk,
-                color=0x3498db  # Синий цвет для размышлений
+                color=0x3498db
             )
             await send_method(embed=embed)
 
-    async def smart_send(content):
+    async def smart_send(content: str) -> None:
+        """
+        Smartly split and send content, handling code blocks and thinking content.
+        
+        Args:
+            content: Content to send
+        """
         thinking_text, response = extract_thinking(content)
 
         if thinking_text:
@@ -72,7 +115,7 @@ async def send_split_message(self, response: str, message):
         messages_to_send = []
 
         for block in blocks:
-            code_match = re.match(r'```([a-zA-Z]*)\n(.*?)```', block, re.DOTALL)
+            code_match = re.match(CODE_BLOCK_PATTERN, block, re.DOTALL)
             if code_match:
                 lang = code_match.group(1)
                 code_content = code_match.group(2)
@@ -80,7 +123,7 @@ async def send_split_message(self, response: str, message):
                 code_chunks = split_code_block(lang, code_content)
                 
                 for code_chunk in code_chunks:
-                    if len(current_chunk + '\n' + code_chunk) > char_limit:
+                    if len(current_chunk + '\n' + code_chunk) > CHAR_LIMIT:
                         messages_to_send.append(current_chunk)
                         current_chunk = code_chunk
                     else:
@@ -88,7 +131,7 @@ async def send_split_message(self, response: str, message):
             else:
                 lines = block.split('\n')
                 for line in lines:
-                    if len(current_chunk + '\n' + line) > char_limit:
+                    if len(current_chunk + '\n' + line) > CHAR_LIMIT:
                         messages_to_send.append(current_chunk)
                         current_chunk = line
                     else:
