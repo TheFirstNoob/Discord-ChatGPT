@@ -3,6 +3,7 @@ import asyncio
 from packaging import version
 from importlib.metadata import distribution, PackageNotFoundError
 from src.bot import run_discord_bot
+from src.locale_manager import locale_manager as lm
 
 REQUIREMENTS_FILE = "requirements.txt"
 
@@ -11,8 +12,8 @@ def check_python_version():
     required_version = version.parse("3.10.0")
 
     if python_version < required_version:
-        print(f"\n[ERROR] Для этого проекта требуется Python версии >= 3.10. У вас установлена версия {python_version}.")
-        print("  Пожалуйста, обновите Python до требуемой версии.\n")
+        print(f"\n{lm.get('main_python_version_error', version=python_version)}")
+        print(f"  {lm.get('main_python_version_error_help')}\n")
         sys.exit(1)
 
 async def check_library_versions():
@@ -30,7 +31,7 @@ async def check_library_versions():
                         if not eval(marker, {"python_version": sys.version[:3]}):
                             continue
                     except Exception as e:
-                        print(f"\n[WARNING] Не удалось оценить environment marker '{marker}': {e}. Пакет '{package_spec}' будет пропущен.\n")
+                        print(f"\n{lm.get('main_environment_marker_error', marker=marker, error=str(e), package=package_spec)}\n")
                         continue
                 else:
                     package_spec = line
@@ -46,26 +47,26 @@ async def check_library_versions():
                     if required_version_str:
                         required_version = version.parse(required_version_str)
                         if installed_version_parsed < required_version:
-                            print(f"\n[WARNING] Библиотека '{library_name}' устарела. Требуется версия >= {required_version_str}, у вас установлена {installed_version}.")
-                            print(f"  Пожалуйста, обновите библиотеку с помощью команды: pip install --upgrade '{library_name}'\n")
-                            print("  Возможна нестабильная работа проекта.\n")
+                            print(f"\n{lm.get('main_library_version_warning', library=library_name, required=required_version_str, installed=installed_version)}")
+                            print(f"  {lm.get('main_library_version_warning_help', library=library_name)}\n")
+                            print(f"  {lm.get('main_library_version_warning_unstable')}\n")
                         elif installed_version_parsed > required_version:
-                            print(f"\n[WARNING] Библиотека '{library_name}' новее требуемой. Требуется версия <= {required_version_str}, у вас установлена {installed_version}.")
-                            print("  Возможна нестабильная работа проекта.\n")
+                            print(f"\n{lm.get('main_library_version_warning_newer', library=library_name, required=required_version_str, installed=installed_version)}")
+                            print(f"  {lm.get('main_library_version_warning_unstable')}\n")
                     else:
-                        print(f"\n[INFO] Библиотека '{library_name}' установлена (версия {installed_version}), но версия не указана в {REQUIREMENTS_FILE}.\n")
+                        print(f"\n{lm.get('main_library_version_info', library=library_name, version=installed_version, file=REQUIREMENTS_FILE)}\n")
 
                 except PackageNotFoundError:
-                    print(f"\n[ERROR] Библиотека '{library_name}' не установлена.")
-                    print(f"  Пожалуйста, установите все зависимости с помощью команды: pip install -r {REQUIREMENTS_FILE}\n")
-                    print(f"  Или установите только эту библиотеку с помощью команды: pip install '{library_name}'\n")
+                    print(f"\n{lm.get('main_library_not_found', library=library_name)}")
+                    print(f"  {lm.get('main_library_not_found_help', file=REQUIREMENTS_FILE)}\n")
+                    print(f"  {lm.get('main_library_not_found_help_alt', library=library_name)}\n")
                 except Exception as e:
-                    print(f"\n[ERROR] Произошла ошибка при проверке версии библиотеки '{library_name}': {e}\n")
+                    print(f"\n{lm.get('main_library_check_error', library=library_name, error=str(e))}\n")
 
     except FileNotFoundError:
-        print(f"\n[ERROR] Файл {REQUIREMENTS_FILE} не найден.\n")
+        print(f"\n{lm.get('main_requirements_not_found', file=REQUIREMENTS_FILE)}\n")
     except Exception as e:
-        print(f"\n[ERROR] Произошла ошибка при чтении файла {REQUIREMENTS_FILE}: {e}\n")
+        print(f"\n{lm.get('main_requirements_read_error', file=REQUIREMENTS_FILE, error=str(e))}\n")
 
 async def main():
     check_python_version()

@@ -20,16 +20,19 @@ from g4f.Provider import (
     #CablyAI,           # Now request api_key
     ChatGLM,
     #ChatGptEs,         # data error
+    #Chatai,            # 403 not allowed
     #Cerebras,          # Cloudflare detected
     Cloudflare,
-    DDG,
+    #DDG,               # Now disabled
+    #DuckDuckGo,        # Idk not working
+    #Dynaspark,         # 404 HTML Error
     #DarkAI,            # Disabled in G4F SSL error
     #DeepInfraChat,     # Return auth error but we auth
     #DeepSeek,          # Request api/g4f need add non api endpoint
     Free2GPT,
     #FreeGpt,           # China lang only :c
     GizAI,
-    Glider,
+    #Glider,            # 429 HTML Content error
     OpenaiChat,         # Experimental
     #OIVSCode,          # 503 HTML Error
     #GlhfChat,          # Request api
@@ -38,6 +41,7 @@ from g4f.Provider import (
     #MiniMax,
     TeachAnything,
     PollinationsAI,
+    PuterJS,
     #Reka,              # Request AUTH (har/cookies)
     #PerplexityLabs,    # Cloudflare detected
     #PerplexityApi,
@@ -50,16 +54,13 @@ from g4f.Provider import (
     RetryProvider
 )
 
-# This is example for api_key later
-#from g4f.Provider.needs_auth import DeepSeekAPI    # use if you have dsk.api lib
-
 from g4f.models import __models__
 
 # local
 from src.locale_manager import locale_manager as lm
 from src.log import logger
 from utils.message_utils import send_split_message
-from utils.files_utils import read_json, write_json, read_file, write_file
+from utils.files_utils import write_json, read_file, write_file
 from utils.encryption_utils import UserDataEncryptor
 from utils.reminder_utils import init_reminder_scheduler, run_reminder_scheduler
 from utils.ban_utils import ban_manager
@@ -95,34 +96,15 @@ for directory in [USER_DATA_DIR, REMINDERS_DIR, BANS_DIR]:
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def _initialize_providers() -> Dict[str, List[Any]]:
+def _initialize_providers_and_keys() -> Tuple[Dict[str, List[Any]], Dict[Any, Optional[str]]]:
     """
-    Initialize and configure AI providers.
-    
+    Initialize and configure AI providers and collect their api_keys.
     Returns:
-        Dictionary mapping model names to their available providers
+        providers_dict: model_name -> [ProviderClass, ...]
+        provider_api_keys: ProviderClass -> api_key or None
     """
     logger.info(lm.get('log_providers_init'))
 
-    """
-    ⚠️ EXPERIMENTAL CODE WARNING FOR API REALISE ⚠️
-
-    This implementation is in an early experimental stage.
-    - May contain significant bugs
-    - Not recommended for production use
-    - Requires further testing and refinement
-
-
-    🤝 COMMUNITY HELP WANTED 🤝
-
-    If you are an experienced developer and can help improve this implementation, 
-    I would be extremely grateful! 
-
-    Suggestions, code reviews, and collaborative improvements are welcome.
-    Please feel free to contact me or submit improvements via GitHub/other platforms.
-
-    Your expertise could help make this code more robust and reliable.
-    """
     api_providers = {
         "Groq": os.getenv("GROQ_API_KEY"),
         #"Anthropic": os.getenv("ANTHROPIC_API_KEY"),    # import error :c
@@ -134,41 +116,52 @@ def _initialize_providers() -> Dict[str, List[Any]]:
     }
 
     providers_dict = {
-        "gpt-4o-mini": [DDG, PollinationsAI, Blackbox],
-        "gpt-4o": [PollinationsAI],
-        "o3-mini": [DDG, PollinationsAI, Blackbox],
+        "gpt-3.5-turbo": [PuterJS],
+        "gpt-4o-mini": [PollinationsAI, Blackbox],
+        "gpt-4o": [PollinationsAI, Blackbox, PuterJS],
+        "gpt-4.1": [PollinationsAI, PuterJS],
+        "gpt-4.1-nano": [PollinationsAI, PuterJS],
+        "gpt-4.1-mini": [PollinationsAI, PuterJS],
+        "gpt-4.1-xlarge": [PollinationsAI],
+        "gpt-4.5": [PuterJS],
+        "o3-mini": [PollinationsAI, Blackbox, PuterJS],
+        "o3-mini-high": [PuterJS],
+        "o4-mini": [PollinationsAI],
         "blackboxai": [Blackbox],
         "command-r-plus": [HuggingSpace, HuggingChat],
+        "CohereLabs/c4ai-command-r-plus-08-2024": [HuggingChat], #temp
         "command-r7b-12-2024": [HuggingSpace],
         "command-a": [HuggingSpace],
-        "claude-3-haiku": [DDG],    # working. i disable for new models space
-        "claude-3.5-sonnet": [Blackbox],
+        "claude-3.5-sonnet": [Blackbox, PuterJS],
         "claude-3.7-sonnet": [Blackbox],
-        "gemini-1.5-flash": [GizAI, Blackbox, TeachAnything, Websim],
-        "gemini-1.5-pro": [Blackbox, Free2GPT, TeachAnything, Websim],
+        "gemini-1.5-flash": [GizAI, TeachAnything, Websim],
+        "gemini-1.5-pro": [Free2GPT, TeachAnything, Websim],
         "gemini-2.0-flash": [Blackbox, PollinationsAI],
         "gemini-2.0-flash-thinking": [PollinationsAI],
-        "llama-3.1-405b": [Blackbox],
-        "llama-3.2-11b": [HuggingChat], # Vision
-        "llama-3.3-70b": [HuggingChat, Blackbox],
+        "llama-3.2-11b": [PollinationsAI],
+        "llama-3.3-70b": [HuggingChat, Blackbox, PollinationsAI],
         "llama-4-scout": [Cloudflare, PollinationsAI],
-        "qwq-32b": [Blackbox, HuggingChat], # HuggingChat has Starting resoning only, idk at this moment how to fix
+        "qwq-32b": [Blackbox, HuggingChat],
         "qwen-qvq-72b-preview": [HuggingSpace],
-        "qwen-2.5-72b": [HuggingChat],
-        "qwen-2.5-coder-32b": [HuggingChat, PollinationsAI],
+        "Qwen/Qwen2.5-72B-Instruct": [HuggingChat], #temp
+        "Qwen/Qwen2.5-VL-32B-Instruct": [HuggingChat], #temp
+        "qwen-2.5-coder-32b": [PollinationsAI],
         "qwen-2.5-coder": [Cloudflare],
-        "qwen-2.5-1m-demo": [HuggingSpace],
-        "qwen-2.5-max": [HuggingSpace],
-        #"nemotron-70b": [HuggingChat], # working. i disable for new models space
-        "deepseek-chat": [Blackbox],
-        "deepseek-v3": [Blackbox, PollinationsAI],
-        "deepseek-r1": [HuggingChat, Glider, Blackbox, PollinationsAI],
-        "mixtral-small-24b": [DDG, Blackbox],
+        "qwen-2.5-1m": [HuggingSpace],
+        "qwen-2-5-max": [HuggingSpace],
+        "qwen3-32b": [HuggingSpace],
+        "qwen3-235b-a22b": [HuggingSpace],
+        "nemotron-70b": [HuggingChat],
+        "deepseek-v3": [PollinationsAI],
+        "deepseek-r1": [HuggingChat, Blackbox, PollinationsAI],
+        "deepseek-r1-qwen-32b": [Cloudflare],
+        "deepseek-r1-distill-llama-70b": [PollinationsAI],
         "glm-4": [ChatGLM],
-        "phi-3.5-mini": [HuggingChat],
         "phi-4": [PollinationsAI, HuggingSpace],
-        "google/gemma-3-27b-it": [PollinationsAI],
+        "google/gemma-3-27b-it": [PollinationsAI], #temp
     }
+
+    provider_api_keys = {}
 
     for provider_name, api_key in api_providers.items():
         if not api_key or not api_key.strip():
@@ -178,11 +171,12 @@ def _initialize_providers() -> Dict[str, List[Any]]:
         is_test = api_key.lower() == 'test'
         if is_test:
             logger.warning(lm.get('log_provider_warning').format(provider=provider_name))
-            
+
         try:
             provider_class = getattr(g4f.Provider, provider_name)
-            provider_added_to_models = []
+            provider_api_keys[provider_class] = api_key
 
+            provider_added_to_models = []
             for model_name in __models__:
                 if model_name in providers_dict:
                     if provider_class in __models__[model_name][1]:
@@ -195,14 +189,14 @@ def _initialize_providers() -> Dict[str, List[Any]]:
                     logger.info(lm.get('log_provider_test_added').format(provider=provider_name, models=provider_added_to_models))
                 else:
                     logger.info(lm.get('log_provider_added').format(provider=provider_name, models=provider_added_to_models))
-        
+
         except AttributeError:
             logger.warning(lm.get('log_provider_not_found').format(provider=provider_name))
         except Exception as e:
             logger.error(lm.get('log_provider_add_error').format(provider=provider_name, error=e))
 
     logger.info(lm.get('log_providers_complete'))
-    return providers_dict
+    return providers_dict, provider_api_keys
 
 class UserCache:
     """Cache for user data with sliding and absolute TTL."""
@@ -275,7 +269,7 @@ class DiscordClient(discord.Client):
         
         # Initialize components
         self.tree = app_commands.CommandTree(self)
-        self.providers_dict = _initialize_providers()
+        self.providers_dict, self.provider_api_keys = _initialize_providers_and_keys()
         self.default_model = os.getenv("MODEL", "gpt-4o")
         self.max_history_length = int(os.getenv("MAX_HISTORY_LENGTH", 30))
         self.apply_instruction_to_all = os.getenv("APPLY_INSTRUCTION_TO_ALL", "False").lower() == "true"
@@ -300,8 +294,7 @@ class DiscordClient(discord.Client):
 
     async def setup_hook(self) -> None:
         """Set up the client's background tasks."""
-        logger.info(lm.get('log_discord_init'))
-        logger.info(lm.get('log_reminder_scheduler_prepare'))
+        logger.info(lm.get('log_scheduler_prepare'))
         await init_reminder_scheduler(self)
 
         async def run_reminders_check():
@@ -575,7 +568,6 @@ class DiscordClient(discord.Client):
               - "bot_response": the text reply from the AI, or
               - "error": an error message if all providers failed.
         """
-        # Copy the list of providers for this model
         providers = list(self.providers_dict.get(user_model, []))
         last_error = None
 
@@ -583,13 +575,17 @@ class DiscordClient(discord.Client):
             try:
                 logger.info(lm.get('log_provider_trying').format(provider=provider))
 
-                # get or create a client for this provider
-                client = self.clients_by_provider.get(provider)
+                # get or create a client for this provider, with api_key if available
+                api_key = self.provider_api_keys.get(provider)
+                client_key = (provider, api_key)
+                client = self.clients_by_provider.get(client_key)
                 if not client:
-                    client = AsyncClient(provider=provider)
-                    self.clients_by_provider[provider] = client
+                    if api_key:
+                        client = AsyncClient(provider=provider, api_key=api_key)
+                    else:
+                        client = AsyncClient(provider=provider)
+                    self.clients_by_provider[client_key] = client
 
-                # send the request
                 response = await client.chat.completions.create(
                     model=user_model,
                     messages=conversation_history,
@@ -606,9 +602,7 @@ class DiscordClient(discord.Client):
             except Exception as e:
                 logger.exception(lm.get('log_provider_failed').format(provider=provider, error=e))
                 last_error = e
-                # try next provider
 
-        # all providers failed
         return {
             "error": (
                 f":x: **{lm.get('error_all_providers_failed')}**\n"
@@ -641,16 +635,18 @@ class DiscordClient(discord.Client):
         """
         await self.save_user_data(user_id, {'history': [], 'model': self.default_model})
 
-    async def set_user_model(self, user_id: int, model_name: str) -> None:
+    async def set_user_model(self, user_id: int, model_name: str, vision_support: bool = False) -> None:
         """
         Set model for a user.
         
         Args:
             user_id: Discord user ID
             model_name: Model name
+            vision_support: Whether the model supports vision
         """
         user_data = await self.load_user_data(user_id)
         user_data['model'] = model_name
+        user_data['vision_support'] = vision_support
         await self.save_user_data(user_id, user_data)
 
     async def load_user_data(self, user_id: Optional[int], channel_id: Optional[int] = None) -> Dict[str, Any]:

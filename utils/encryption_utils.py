@@ -18,10 +18,7 @@ class EncryptionKey:
     def generate(cls) -> 'EncryptionKey':
         """Generate a new encryption key."""
         key = Fernet.generate_key()
-        return cls(
-            key=key,
-            encoded_key=base64.urlsafe_b64encode(key).decode()
-        )
+        return cls(key=key, encoded_key=base64.urlsafe_b64encode(key).decode())
 
     @classmethod
     def from_encoded(cls, encoded_key: str) -> 'EncryptionKey':
@@ -41,17 +38,13 @@ class UserDataEncryptor:
 
     async def initialize(self) -> 'UserDataEncryptor':
         """Initialize the encryptor with a key."""
-        if not self._initialized:
-            # Skip encryption for channels
-            if self.channel_id is not None:
-                self._initialized = True
-                return self
-
-            if not os.path.exists('keys'):
-                os.makedirs('keys')
-            
-            self.cipher_suite = await self._load_or_generate_key()
+        if self._initialized or self.channel_id is not None:
             self._initialized = True
+            return self
+
+        os.makedirs('keys', exist_ok=True)
+        self.cipher_suite = await self._load_or_generate_key()
+        self._initialized = True
         return self
 
     async def _load_or_generate_key(self) -> Optional[Fernet]:
@@ -63,14 +56,14 @@ class UserDataEncryptor:
         try:
             if os.path.exists(self.key_file):
                 key_data = await read_json(self.key_file)
-                if not key_data or 'key' not in key_data:
+                if not key_data.get('key'):
                     logger.error(lm.get('encryption_invalid_key_file'))
                     return None
                 key = EncryptionKey.from_encoded(key_data['key'])
             else:
                 key = EncryptionKey.generate()
                 await write_json(self.key_file, {'key': key.encoded_key})
-            
+
             return Fernet(key.key)
         except Exception as e:
             logger.error(lm.get('encryption_key_error').format(error=e))
@@ -78,14 +71,12 @@ class UserDataEncryptor:
 
     async def encrypt(self, data: Any) -> Optional[str]:
         """Encrypt data and return as base64 encoded string."""
-        # Skip encryption for channels
         if self.channel_id is not None:
             return json.dumps(data, ensure_ascii=False)
 
+        await self.initialize()        
         if not self.cipher_suite:
-            await self.initialize()
-            if not self.cipher_suite:
-                return None
+            return None
         
         try:
             json_data = json.dumps(data, ensure_ascii=False)
@@ -97,7 +88,6 @@ class UserDataEncryptor:
 
     async def decrypt(self, encrypted_data: str) -> Optional[Any]:
         """Decrypt base64 encoded string back to original data."""
-        # Skip decryption for channels
         if self.channel_id is not None:
             try:
                 return json.loads(encrypted_data)
@@ -105,10 +95,9 @@ class UserDataEncryptor:
                 logger.error(lm.get('encryption_invalid_json').format(error=e))
                 return None
 
+        await self.initialize()        
         if not self.cipher_suite:
-            await self.initialize()
-            if not self.cipher_suite:
-                return None
+            return None
         
         try:
             decoded_data = base64.urlsafe_b64decode(encrypted_data.encode('utf-8'))
@@ -126,18 +115,14 @@ class UserDataEncryptor:
 
     async def rotate_key(self) -> bool:
         """Rotate the encryption key and re-encrypt data if needed."""
+        await self.initialize()        
         if not self.cipher_suite:
-            await self.initialize()
-            if not self.cipher_suite:
-                return False
+            return False
 
         try:
             new_key = EncryptionKey.generate()
-            new_cipher = Fernet(new_key.key)
-            
             await write_json(self.key_file, {'key': new_key.encoded_key})
-            
-            self.cipher_suite = new_cipher
+            self.cipher_suite = Fernet(new_key.key)
             return True
         except Exception as e:
             logger.error(lm.get('encryption_rotate_error').format(error=e))

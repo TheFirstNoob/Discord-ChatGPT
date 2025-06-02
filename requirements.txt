@@ -7,4 +7,4 @@ beautifulsoup4==4.13.4
 duckduckgo-search==8.0.1
 pymupdf==1.25.5
 cryptography==44.0.2
-g4f==0.5.1.6
+g4f==0.5.3.2

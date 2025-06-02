@@ -36,15 +36,11 @@ class BanData:
 
     def is_expired(self) -> bool:
         """Check if the ban has expired."""
-        if self.duration is None:
-            return False
-        return datetime.now() > self.timestamp + timedelta(**self.duration)
+        return self.duration is not None and datetime.now() > self.timestamp + timedelta(**self.duration)
 
     def get_unban_date(self) -> Optional[datetime]:
         """Get the date when the ban will expire."""
-        if self.duration is None:
-            return None
-        return self.timestamp + timedelta(**self.duration)
+        return self.timestamp + timedelta(**self.duration) if self.duration else None
 
 class BanManager:
     """Manages user bans and ban-related operations."""
@@ -54,6 +50,7 @@ class BanManager:
         os.makedirs(bans_dir, exist_ok=True)
         self.admin_id = int(os.getenv('ADMIN_ID', 0))
         self._ban_cleanup_running = False
+        logger.info(lm.get('ban_manager_start'))
 
     async def get_ban_filepath(self, user_id: int) -> str:
         """Get the filepath for a user's ban data."""
@@ -65,11 +62,9 @@ class BanManager:
             return
 
         self._ban_cleanup_running = True
-        logger.info(lm.get('ban_manager_start'))
-
+ 
         try:
             await self.cleanup_expired_bans()
-            logger.info(lm.get('ban_manager_complete'))
         except Exception as e:
             logger.error(lm.get('ban_manager_error').format(error=e))
         finally:
@@ -92,14 +87,17 @@ class BanManager:
             logger.error(lm.get('ban_user_error').format(user_id=user_id, error=e))
             raise
 
-    async def unban_user(self, user_id: int) -> bool:
+    async def unban_user(self, user_id: int, auto: bool = False) -> bool:
         """Remove a user's ban."""
         ban_file = await self.get_ban_filepath(user_id)
         
         if os.path.exists(ban_file):
             try:
                 os.remove(ban_file)
-                logger.info(lm.get('unban_user_success').format(user_id=user_id))
+                if auto:
+                    logger.info(lm.get('ban_user_auto_unbanned').format(user_id=user_id))
+                else:
+                    logger.info(lm.get('unban_user_success').format(user_id=user_id))
                 return True
             except Exception as e:
                 logger.error(lm.get('unban_user_error').format(user_id=user_id, error=e))
@@ -110,17 +108,10 @@ class BanManager:
     async def get_ban_message(self, ban_data: BanData, target_user_id: int, is_self_check: bool) -> Dict[str, Any]:
         """Generate ban message embed data."""
         ban_time = ban_data.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        unban_date = ban_data.get_unban_date()
-        
-        if unban_date is None:
-            unban_text = lm.get('ban_embed_permanent')
-        else:
-            unban_text = lm.get('ban_embed_unban_date').format(date=unban_date.strftime('%Y-%m-%d %H:%M:%S'))
+        unban_text = lm.get('ban_embed_permanent') if ban_data.get_unban_date() is None else lm.get('ban_embed_unban_date').format(date=ban_data.get_unban_date().strftime('%Y-%m-%d %H:%M:%S'))
 
-        title = (lm.get('ban_embed_title_self') if is_self_check 
-                else lm.get('ban_embed_title_other').format(user_id=target_user_id))
-        description = (lm.get('ban_embed_description_self') if is_self_check 
-                      else lm.get('ban_embed_description_other').format(user_id=target_user_id))
+        title = lm.get('ban_embed_title_self') if is_self_check else lm.get('ban_embed_title_other').format(user_id=target_user_id)
+        description = lm.get('ban_embed_description_self') if is_self_check else lm.get('ban_embed_description_other').format(user_id=target_user_id)
 
         return {
             "title": title,
@@ -148,7 +139,7 @@ class BanManager:
             return False, None
 
         if ban_data.is_expired():
-            await self.unban_user(user_id)
+            await self.unban_user(user_id, auto=True)
             return False, None
 
         return True, await self.get_ban_message(ban_data, user_id, is_self_check)
@@ -193,41 +184,31 @@ class BanManager:
 
         banned_users = []
         for filename in os.listdir(self.bans_dir):
-            if not filename.endswith('_ban.json'):
-                continue
+            if filename.endswith('_ban.json'):
+                try:
+                    user_id = int(filename.split('_')[0])
+                    ban_file = await self.get_ban_filepath(user_id)
+                    data = await read_json(ban_file)
+                    ban_data = BanData.from_dict(data)
 
-            try:
-                user_id = int(filename.split('_')[0])
-                ban_file = await self.get_ban_filepath(user_id)
-                data = await read_json(ban_file)
-                ban_data = BanData.from_dict(data)
+                    if not ban_data.is_expired():
+                        banned_users.append({'user_id': user_id, 'reason': ban_data.reason})
+                    else:
+                        await self.unban_user(user_id, auto=True)
+                except Exception as e:
+                    logger.error(lm.get('get_banned_users_error').format(user_id=user_id, error=e))
 
-                if ban_data.is_expired():
-                    await self.unban_user(user_id)
-                    continue
-
-                banned_users.append({
-                    'user_id': user_id,
-                    'reason': ban_data.reason
-                })
-            except Exception as e:
-                logger.error(lm.get('get_banned_users_error').format(user_id=user_id, error=e))
-                continue
-        
         return banned_users
 
     async def cleanup_expired_bans(self) -> None:
         """Clean up all expired bans."""
         for filename in os.listdir(self.bans_dir):
-            if not filename.endswith('_ban.json'):
-                continue
-
-            try:
-                user_id = int(filename.split('_')[0])
-                await self.is_user_banned(user_id)
-            except Exception as e:
-                logger.error(lm.get('cleanup_expired_bans_error').format(user_id=user_id, error=e))
-                continue
+            if filename.endswith('_ban.json'):
+                try:
+                    user_id = int(filename.split('_')[0])
+                    await self.is_user_banned(user_id)
+                except Exception as e:
+                    logger.error(lm.get('cleanup_expired_bans_error').format(user_id=user_id, error=e))
 
 # Global instance
 ban_manager = BanManager()

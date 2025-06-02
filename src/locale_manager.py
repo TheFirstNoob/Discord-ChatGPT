@@ -21,7 +21,7 @@ class LocaleManager:
             with open(default_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
 
-    def get(self, key: str, default: str = '') -> str:
+    def get(self, key: str, default: str = '', **kwargs) -> str:
         keys = key.split('.')
         value = self.locale_data
         
@@ -31,6 +31,11 @@ class LocaleManager:
             else:
                 return default
         
-        return value if isinstance(value, str) else default
+        if isinstance(value, str):
+            try:
+                return value.format(**kwargs)
+            except KeyError:
+                return value
+        return default
 
 locale_manager = LocaleManager()
