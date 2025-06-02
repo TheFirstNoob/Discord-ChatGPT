@@ -5,6 +5,8 @@ asgiref==3.8.1
 aiofiles==24.1.0
 beautifulsoup4==4.13.4
 duckduckgo-search==8.0.1
-pymupdf==1.25.5
+docling==2.35.0
 cryptography==44.0.2
+nodriver==0.46.1
 g4f==0.5.3.2
+
